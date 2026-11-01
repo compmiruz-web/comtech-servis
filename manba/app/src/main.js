@@ -224,7 +224,7 @@ function vSotuv(){
   return `<div class="grid2">
   <section class="panel">
     <h2>Shtrix-kod orqali sotish</h2>
-    <form id="scanF" class="scan"><input id="scanIn" autocomplete="off" placeholder="Skanerlang yoki nomini yozing…"><button class="pri">Qo'shish</button></form>
+    <form id="scanF" class="scan"><input id="scanIn" autocomplete="off" placeholder="Skanerlang yoki nomini yozing…"><button type="button" data-cam="scanIn" title="Kamera bilan skanerlash" aria-label="Kamera bilan skanerlash">📷</button><button class="pri">Qo'shish</button></form>
     <div id="sugg" class="sugg"></div>
     <p class="small muted">Skaner bilan o'qing yoki nomini yozib Enter bosing. Narx dollar kursi bo'yicha so'mda chiqadi.</p>
   </section>
@@ -325,7 +325,7 @@ function vOmbor(){
   const stockVal=S.products.reduce((a,p)=>a+p.costUsd*p.qty,0);
   return `${canStock()?`<section class="panel"><h2>Kirim qilish</h2>
     <form id="kirimF" class="form">
-      <label>Shtrix-kod<span class="row" style="flex-wrap:nowrap"><input id="k_bar" required inputmode="numeric" placeholder="Skanerlang"><button type="button" class="sm" id="genBar" title="Shtrix-kodi yo'q tovar uchun">Yaratish</button></span></label>
+      <label>Shtrix-kod<span class="row" style="flex-wrap:nowrap"><input id="k_bar" required inputmode="numeric" placeholder="Skanerlang"><button type="button" class="sm" data-cam="k_bar" title="Kamera bilan skanerlash">📷</button><button type="button" class="sm" id="genBar" title="Shtrix-kodi yo'q tovar uchun">Yaratish</button></span></label>
       <label class="full">Nomi<input id="k_name" required placeholder="Masalan: SSD Samsung 870 EVO 500GB"></label>
       <label>Yo'nalish (etiketka uchun)<select id="k_line"><option value="noutbuk">Noutbuk</option><option value="kompyuter" selected>Kompyuter / qism</option><option value="servis">Servis</option></select></label>
       <label>Soni<input id="k_qty" type="number" min="1" value="1" required></label>
@@ -809,6 +809,38 @@ function sysNotify(n){
     navigator.serviceWorker?.getRegistration().then(r=>r?r.showNotification(n.title,o):new Notification(n.title,o)).catch(()=>{try{new Notification(n.title,o)}catch{}});
   }catch{}
 }
+/* ---------- kamera orqali shtrix-kod skanerlash ---------- */
+let camStop=null;
+async function camScan(onCode){
+  if(!navigator.mediaDevices?.getUserMedia) return toast('Bu qurilmada kamera ochilmadi (HTTPS va brauzer ruxsati kerak)');
+  modal(`<h3>Kamera bilan skanerlash</h3>
+    <div style="position:relative;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3">
+      <video id="camV" playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
+      <div style="position:absolute;left:8%;right:8%;top:50%;height:2px;background:#e5484d;box-shadow:0 0 8px #e5484d"></div></div>
+    <p class="small muted" id="camMsg" style="margin:8px 0">Shtrix-kodni qizil chiziq ustiga to'g'rilang…</p>
+    <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button></div>`);
+  const video=document.getElementById('camV'); let stream=null, done=false, ctrl=null;
+  const stop=()=>{done=true; try{ctrl?.stop()}catch{} stream?.getTracks().forEach(t=>t.stop()); camStop=null;};
+  camStop=stop;
+  const hit=(code)=>{ if(done||!code) return; stop(); try{navigator.vibrate?.(80)}catch{} closeModal(); onCode(String(code).trim()); };
+  try{
+    if('BarcodeDetector' in window){
+      const det=new BarcodeDetector({formats:['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code','itf']});
+      stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280}},audio:false});
+      video.srcObject=stream; await video.play();
+      const loop=async()=>{ if(done) return; try{const r=await det.detect(video); if(r[0]) return hit(r[0].rawValue);}catch{} setTimeout(loop,150); };
+      loop();
+    }else{
+      const { BrowserMultiFormatReader } = await import('@zxing/browser');
+      const reader=new BrowserMultiFormatReader();
+      ctrl=await reader.decodeFromConstraints({video:{facingMode:{ideal:'environment'}}},video,(res)=>{ if(res) hit(res.getText()); });
+    }
+  }catch(e){
+    stop();
+    const m=document.getElementById('camMsg');
+    if(m) m.textContent=e?.name==='NotAllowedError'?'Kameraga ruxsat berilmadi. Brauzer manzil satridagi 🔒 belgisidan kameraga ruxsat bering.':e?.name==='NotFoundError'?'Kamera topilmadi. USB skaner ulang yoki kodni qo\'lda yozing.':'Kamera ochilmadi: '+(e?.message||e);
+  }
+}
 function payModal(id){
   const u=S.users.find(x=>x.id===id), p=payroll(u);
   modal(`<h3>${esc(u.name)}: oylik sozlamasi</h3><form id="payF" data-u="${u.id}" style="display:grid;gap:10px">
@@ -821,7 +853,7 @@ function payModal(id){
 
 /* ---------- modal / role ---------- */
 function modal(html){document.getElementById('modalRoot').innerHTML=`<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;}
-function closeModal(){document.getElementById('modalRoot').innerHTML='';}
+function closeModal(){camStop?.();document.getElementById('modalRoot').innerHTML='';}
 /* ---------- render & events ---------- */
 const views={nasiya:vNasiya,qarz:vQarz,rasxod:vRasxod,mening:vMening,xodimlar:vXodimlar,sotuv:vSotuv,ombor:vOmbor,ustaxona:vUstaxona,mijozlar:vMijozlar,hisobot:vHisobot,sozlamalar:vSozlamalar,bildirish:vBildirish};
 function render(){
@@ -1194,6 +1226,14 @@ document.addEventListener('input', (e) => {
   }
 });
 
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.id === 'k_bar') {
+    e.preventDefault();
+    const code = e.target.value.trim(); if (!code) return;
+    e.target.dispatchEvent(new Event('input', { bubbles: true }));
+    (document.getElementById(S.products.some((p) => p.barcode === code) ? 'k_qty' : 'k_name'))?.focus();
+  }
+});
 document.addEventListener('change', async (e) => {
   const t = e.target;
   try {
@@ -1248,6 +1288,15 @@ document.addEventListener('click', async (e) => {
     if (b.id === 'logoutBtn') { await db.auth.signOut(); closeModal(); cart = []; location.hash = ''; showLogin(); }
     if (b.dataset.pay) payModal(b.dataset.pay);
     if (b.dataset.salpay) salPayModal(b.dataset.salpay);
+    if (b.dataset.cam) {
+      const target = b.dataset.cam;
+      camScan((code) => {
+        const el = document.getElementById(target); if (!el) return;
+        el.value = code;
+        if (target === 'scanIn') document.getElementById('scanF').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        else { el.dispatchEvent(new Event('input', { bubbles: true })); (document.getElementById(S.products.some((p) => p.barcode === code) ? 'k_qty' : 'k_name'))?.focus(); }
+      });
+    }
     if (b.dataset.saldel) {
       const x = S.salPays.find((y) => String(y.id) === b.dataset.saldel);
       modal(`<h3>Oylik yozuvini o'chirish</h3><p>${esc(uName(x?.toUser))}: ${fmt(x?.amountUzs || 0)} so'm, ${x ? new Date(x.ts).toLocaleString('uz') : ''}. O'chirilsinmi?</p>
