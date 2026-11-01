@@ -22,14 +22,14 @@ Deno.serve(async (req) => {
   if (prof?.role !== 'owner' || !prof.active) return json({ error: 'Faqat rahbar' }, 403);
 
   const b = await req.json();
-  const pinOk = (p: string) => /^\d{1,12}$/.test(String(p || '').trim());
+  const pinOk = (p: string) => { const t = String(p || '').trim(); return t.length >= 1 && t.length <= 30; };
   const loginOk = (l: string) => normLogin(l).length >= 1 && normLogin(l).length <= 30;
   try {
     if (b.action === 'create') {
       const login = normLogin(b.login);
       if (!loginOk(login)) return json({ error: "Login 1-30 belgi bo'lsin" }, 400);
       if (!['usta', 'sotuvchi'].includes(b.role)) return json({ error: "Lavozim noto'g'ri" }, 400);
-      if (!pinOk(b.pin)) return json({ error: "PIN faqat raqam bo'lsin (1-12 ta)" }, 400);
+      if (!pinOk(b.pin)) return json({ error: "Parol 1-30 belgi bo'lsin" }, 400);
       const { data: u, error } = await db.auth.admin.createUser({ email: loginToEmail(login), password: pinPw(b.pin), email_confirm: true });
       if (error) return json({ error: error.message.includes('already') ? 'Bu login band' : error.message }, 400);
       const { error: e2 } = await db.from('profiles').insert({
@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
         prof.login = login; patch.email = loginToEmail(login); patch.email_confirm = true;
       }
       if (b.pin !== undefined && String(b.pin).trim() !== '') {
-        if (!pinOk(b.pin)) return json({ error: "PIN faqat raqam bo'lsin (1-12 ta)" }, 400);
+        if (!pinOk(b.pin)) return json({ error: "Parol 1-30 belgi bo'lsin" }, 400);
         patch.password = pinPw(b.pin);
       }
       if (Object.keys(patch).length) {

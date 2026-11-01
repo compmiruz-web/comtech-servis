@@ -476,8 +476,8 @@ function vXodimlar(){
     <label>Ism<input id="u_name" required></label>
     <label>Lavozim<select id="u_role"><option value="usta">Usta</option><option value="sotuvchi">Sotuvchi</option></select></label>
     <label>Login (istalgan so'z)<input id="u_login" required maxlength="30" autocapitalize="none" placeholder="aziz"></label>
-    <label>PIN (istalgan raqam, 1-12 ta)<input id="u_pin" required inputmode="numeric" pattern="\d{1,12}" placeholder="masalan: 7"></label>
-    <div class="full row"><button class="pri">Qo'shish</button><span class="small muted">Xodim login va PIN bilan kiradi, faqat o'z blokini ko'radi.</span></div>
+    <label>Parol (istalgan so'z yoki raqam)<input id="u_pin" required maxlength="30" autocapitalize="none" placeholder="masalan: 7 yoki ganiyev"></label>
+    <div class="full row"><button class="pri">Qo'shish</button><span class="small muted">Xodim login va parol bilan kiradi, faqat o'z blokini ko'radi.</span></div>
   </form></section>`;
 }
 
@@ -849,7 +849,7 @@ document.addEventListener('click', async (e) => {
       modal(`<h3>${esc(u.name)}: tahrirlash</h3><form id="pinSetF" data-u="${u.id}" style="display:grid;gap:10px">
         <label>Ism<input id="ps_name" required value="${esc(u.name)}"></label>
         <label>Login<input id="ps_login" required maxlength="30" autocapitalize="none" value="${esc(u.login || '')}"></label>
-        <label>Yangi PIN (bo'sh qolsa, eskisi qoladi)<input id="ps_pin" inputmode="numeric" pattern="\\d{1,12}" placeholder="istalgan raqam"></label>
+        <label>Yangi parol (bo'sh qolsa, eskisi qoladi)<input id="ps_pin" maxlength="30" autocapitalize="none" placeholder="istalgan so'z yoki raqam"></label>
         <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div></form>`);
     }
     if (b.hasAttribute('data-close')) closeModal();
