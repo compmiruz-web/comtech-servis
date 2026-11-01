@@ -50,6 +50,7 @@ async function sendReport(db: Db, s: any, day: string) {
     `📊 ${name} · ${dmy(day)} kunlik hisobot`, '',
     `🛒 Sotuv: ${d.sales_count} ta · ${fmt(d.revenue)} so'm`,
     ...Object.entries(d.by_pay || {}).map(([k, v]) => `    ${PAYS[k] || k}: ${fmt(v)}`),
+    ...(Number(d.returns) ? [`↩️ Vazvrat: ${d.returns_count} ta · −${fmt(d.returns)} so'm`] : []),
     `🔧 Remont: qabul ${d.repairs_in} ta · topshirildi ${d.repairs_done} ta · ${fmt(d.repair_income)} so'm`,
     `💸 Rasxod: ${d.exp_count} ta · ${fmt(d.expenses)} so'm`,
     ...Object.entries(d.by_cat || {}).map(([k, v]) => `    ${CATS[k] || k}: ${fmt(v)}`),
@@ -96,7 +97,7 @@ async function all(db: Db, table: string) {
 
 async function sendBackup(db: Db, s: any, day: string) {
   const tables = ['settings', 'profiles', 'staff_pay', 'products', 'product_costs', 'stock_moves', 'clients',
-    'repairs', 'sales', 'sale_items', 'sale_item_costs', 'expenses', 'supplier_debts', 'debt_payments'];
+    'repairs', 'sales', 'sale_items', 'sale_item_costs', 'expenses', 'supplier_debts', 'debt_payments', 'sale_returns'];
   const dump: Record<string, unknown[]> = {};
   for (const t of tables) dump[t] = await all(db, t);
   const body = JSON.stringify({ app: 'comtech-servis', version: 1, created: new Date().toISOString(), tables: dump });
