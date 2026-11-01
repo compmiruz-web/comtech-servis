@@ -36,6 +36,7 @@ Deno.serve(async (req) => {
       done.push('backup');
     }
     done.push(`notified:${await notifyReady(db, s)}`);
+    done.push(`reminded:${await remindCredit(db, s, day)}`);
   } catch (e) {
     return json({ error: String(e), done }, 500);
   }
@@ -51,6 +52,8 @@ async function sendReport(db: Db, s: any, day: string) {
     `🛒 Sotuv: ${d.sales_count} ta · ${fmt(d.revenue)} so'm`,
     ...Object.entries(d.by_pay || {}).map(([k, v]) => `    ${PAYS[k] || k}: ${fmt(v)}`),
     ...(Number(d.returns) ? [`↩️ Vazvrat: ${d.returns_count} ta · −${fmt(d.returns)} so'm`] : []),
+    ...(Number(d.credit_sales) || Number(d.credit_in) ? [`🧾 Nasiya: berildi ${fmt(d.credit_sales)} · undirildi ${fmt(d.credit_in)} so'm`] : []),
+    ...(Number(d.credit_overdue_count) ? [`⚠️ Muddati o'tgan nasiya: ${d.credit_overdue_count} ta · ${fmt(d.credit_overdue)} so'm`] : []),
     `🔧 Remont: qabul ${d.repairs_in} ta · topshirildi ${d.repairs_done} ta · ${fmt(d.repair_income)} so'm`,
     `💸 Rasxod: ${d.exp_count} ta · ${fmt(d.expenses)} so'm`,
     ...Object.entries(d.by_cat || {}).map(([k, v]) => `    ${CATS[k] || k}: ${fmt(v)}`),
@@ -97,7 +100,7 @@ async function all(db: Db, table: string) {
 
 async function sendBackup(db: Db, s: any, day: string) {
   const tables = ['settings', 'profiles', 'staff_pay', 'products', 'product_costs', 'stock_moves', 'clients',
-    'repairs', 'sales', 'sale_items', 'sale_item_costs', 'expenses', 'supplier_debts', 'debt_payments', 'sale_returns'];
+    'repairs', 'sales', 'sale_items', 'sale_item_costs', 'expenses', 'supplier_debts', 'debt_payments', 'sale_returns', 'customer_debts', 'customer_payments'];
   const dump: Record<string, unknown[]> = {};
   for (const t of tables) dump[t] = await all(db, t);
   const body = JSON.stringify({ app: 'comtech-servis', version: 1, created: new Date().toISOString(), tables: dump });
@@ -146,4 +149,26 @@ async function sms(phone: string, text: string) {
     });
     return r.ok;
   } catch { return false; }
+}
+
+
+// Nasiya muddati yaqinlashgan yoki o'tgan mijozlarga eslatma (har 3 kunda bir marta)
+async function remindCredit(db: Db, s: any, day: string) {
+  const { data: list, error } = await db.rpc('credit_to_remind');
+  if (error) throw error;
+  let n = 0;
+  for (const d of list || []) {
+    const left = Number(d.amount_uzs) - Number(d.paid_uzs);
+    if (left <= 0) continue;
+    const late = d.due_date < day;
+    const text = `Assalomu alaykum, ${d.client_name}! ${s.company?.name || 'COMPMIR'}: ${fmt(left)} so'm qarzingizning to'lash muddati ` +
+      `${dmy(d.due_date)}${late ? ' edi, muddati o\'tdi' : ''}. Iltimos, to'lovni amalga oshiring. Tel: ${s.company?.lines?.servis?.phone || ''}`;
+    let sent = false;
+    const { data: cl } = await db.from('clients').select('tg_chat_id').eq('phone', d.client_phone).maybeSingle();
+    if (cl?.tg_chat_id) { try { await tg('sendMessage', { chat_id: cl.tg_chat_id, text }); sent = true; } catch { /* bot bloklangan */ } }
+    if (await sms(d.client_phone, text)) sent = true;
+    await db.from('customer_debts').update({ last_reminded: day }).eq('id', d.id);
+    if (sent) n++;
+  }
+  return n;
 }

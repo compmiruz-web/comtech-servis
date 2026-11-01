@@ -102,6 +102,7 @@ Deno.serve(async (req) => {
       done.push('backup');
     }
     done.push(`notified:${await notifyReady(db, s)}`);
+    done.push(`reminded:${await remindCredit(db, s, day)}`);
   } catch (e) {
     return json({ error: String(e), done }, 500);
   }
@@ -211,4 +212,26 @@ async function sms(phone: string, text: string) {
     });
     return r.ok;
   } catch { return false; }
+}
+
+
+// Nasiya muddati yaqinlashgan yoki o'tgan mijozlarga eslatma (har 3 kunda bir marta)
+async function remindCredit(db: Db, s: any, day: string) {
+  const { data: list, error } = await db.rpc('credit_to_remind');
+  if (error) throw error;
+  let n = 0;
+  for (const d of list || []) {
+    const left = Number(d.amount_uzs) - Number(d.paid_uzs);
+    if (left <= 0) continue;
+    const late = d.due_date < day;
+    const text = `Assalomu alaykum, ${d.client_name}! ${s.company?.name || 'COMPMIR'}: ${fmt(left)} so'm qarzingizning to'lash muddati ` +
+      `${dmy(d.due_date)}${late ? ' edi, muddati o\'tdi' : ''}. Iltimos, to'lovni amalga oshiring. Tel: ${s.company?.lines?.servis?.phone || ''}`;
+    let sent = false;
+    const { data: cl } = await db.from('clients').select('tg_chat_id').eq('phone', d.client_phone).maybeSingle();
+    if (cl?.tg_chat_id) { try { await tg('sendMessage', { chat_id: cl.tg_chat_id, text }); sent = true; } catch { /* bot bloklangan */ } }
+    if (await sms(d.client_phone, text)) sent = true;
+    await db.from('customer_debts').update({ last_reminded: day }).eq('id', d.id);
+    if (sent) n++;
+  }
+  return n;
 }
