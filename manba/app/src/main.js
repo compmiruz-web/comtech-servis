@@ -23,6 +23,7 @@ const ICONS={
  ustaxona:'<path d="M14.5 6.5a4 4 0 0 0 5 5l-9 9a2.1 2.1 0 0 1-3-3l9-9a4 4 0 0 0-2-2z"/>',
  mijozlar:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 17c.8-1.7 2-2.5 3.5-2.5s2.7.8 3.5 2.5M15 9h3M15 13h3"/>',
  rasxod:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 14.5h2"/><path d="M6 6l9-3 1 3"/>',
+ qarz:'<path d="M4 4h12l4 4v12H4z"/><path d="M8 11h8M8 15h5M15 4v4h4"/>',
  hisobot:'<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>',
  sozlamalar:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-2.7-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 2.7-1.1V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>'};
 const ROLES={owner:'Rahbar',usta:'Usta',sotuvchi:'Sotuvchi'};
@@ -30,6 +31,7 @@ const SKINS=[['yashil','Yashil',['#11704a','#e1f1e9','#eef2f0']],['kok',"Ko'k",[
  ['binafsha','Binafsha',['#5b3fa0','#ebe5f6','#eef2f0']],['grafit','Grafit (qora)',['#f0a830','#1b1e23','#121417']],['tun','Tun (qora)',['#4fd1c5','#121a30','#0b1020']]].slice(0,6);
 const CATS={qism:'Ehtiyot qism',transport:'Transport',ovqat:'Ovqat',kommunal:'Kommunal / internet',ijara:'Ijara',oylik:'Oylik / avans',boshqa:'Boshqa'};
 const canExp=()=>S.mods.expenses&&(owner()||me().canExpense);
+const canDebt=()=>S.mods.debts!==false&&(owner()||me().canDebt);
 const monthOf=ts=>dayOf(ts).slice(0,7);
 function payroll(u){const p=S.payroll[u.id]||{};return {base:+p.base||0,kpiSum:+p.kpi_sum||0,total:+p.total||0,paid:+p.paid||0,left:+p.left_to_pay||0};}
 const kpiLabel=u=>u.role==='usta'?'topshirilgan remontlar summasidan':(u.kpiBase==='tushum'?'savdo tushumidan':'savdo foydasidan');
@@ -185,6 +187,7 @@ function header(){
   document.getElementById('roleBtn').innerHTML=`<span class="ava">${esc(me().name.trim()[0]||'?').toUpperCase()}</span><span><span class="who">${esc(me().name)}</span> <span class="muted small">· ${ROLES[me().role]}</span></span>`;
   const tabs=[['mening','Mening blokim'],['sotuv','Sotuv'],['ombor','Ombor'],['ustaxona','Ustaxona'],['mijozlar','Mijozlar']];
   if(canExp()) tabs.push(['rasxod','Rasxodlar']);
+  if(canDebt()) tabs.push(['qarz','Qarzlar']);
   if(owner()) {tabs[0]=['xodimlar','Xodimlar']; tabs.push(['hisobot','Hisobot']);}
   tabs.push(['sozlamalar','Sozlamalar']);
   if(!tabs.some(t=>t[0]===tab)) tab=tabs[0][0];
@@ -387,6 +390,7 @@ function vSozlamalar(){
   ${owner()?`<section class="panel"><h2>Modullar</h2><div style="display:grid;gap:10px">
     <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" data-mod="expenses" ${S.mods.expenses?'checked':''} style="width:auto"> Kunlik rasxodlar</label>
     <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" data-mod="salary" ${S.mods.salary?'checked':''} style="width:auto"> Oylik va KPI hisobi</label>
+    <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" data-mod="debts" ${S.mods.debts!==false?'checked':''} style="width:auto"> Tovar qarzlari</label>
     <p class="small muted" style="margin:0">O'chirilgan modul hech kimga, xodimlarga ham ko'rinmaydi. Ma'lumotlar o'chmaydi.</p></div></section>`:''}
   ${owner()?`<section class="panel"><h2>Printerlar</h2><form id="prF" class="form">
     <label>Chek va talon printeri<input id="pr_r" value="${esc(S.printers.receipt)}"></label>
@@ -459,10 +463,11 @@ function vXodimlar(){
     <td><div class="row" style="flex-wrap:nowrap">${u.role!=='owner'?`<button class="sm" data-view="${u.id}">Blokini ko'rish</button><button class="sm" data-setpin="${u.id}">Tahrirlash</button>${u.active?`<button class="sm ghost" data-active="0" data-u="${u.id}">O'chirish</button>`:`<button class="sm" data-active="1" data-u="${u.id}">Yoqish</button>`}`:''}</div></td></tr>`}).join('')}
   </tbody></table></div></section>
   <section class="panel"><h2>Ruxsatlar</h2>
-  <div class="tbl"><table><thead><tr><th>Xodim</th><th>Rasxod kiritish</th><th>Oyligini ko'rish</th></tr></thead><tbody>
+  <div class="tbl"><table><thead><tr><th>Xodim</th><th>Rasxod kiritish</th><th>Oyligini ko'rish</th><th>Qarz kiritish</th></tr></thead><tbody>
   ${S.users.filter(u=>u.role!=='owner'&&u.active).map(u=>`<tr><td>${esc(u.name)}</td>
     <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canExpense" data-u="${u.id}" ${u.canExpense?'checked':''} ${S.mods.expenses?'':'disabled'} style="width:auto"> ${u.canExpense?'Yoqilgan':"O'chiq"}</label></td>
-    <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="seeSalary" data-u="${u.id}" ${u.seeSalary?'checked':''} ${S.mods.salary?'':'disabled'} style="width:auto"> ${u.seeSalary?'Yoqilgan':"O'chiq"}</label></td></tr>`).join('')}
+    <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="seeSalary" data-u="${u.id}" ${u.seeSalary?'checked':''} ${S.mods.salary?'':'disabled'} style="width:auto"> ${u.seeSalary?'Yoqilgan':"O'chiq"}</label></td>
+    <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canDebt" data-u="${u.id}" ${u.canDebt?'checked':''} ${S.mods.debts!==false?'':'disabled'} style="width:auto"> ${u.canDebt?'Yoqilgan':"O'chiq"}</label></td></tr>`).join('')}
   </tbody></table></div>
   ${!S.mods.expenses||!S.mods.salary?'<p class="small muted">O\'chirilgan modullar Sozlamalarda yoqiladi.</p>':''}</section>
   ${S.mods.salary?`<section class="panel"><h2>Oylik hisobi · ${today().slice(0,7)}</h2>
@@ -479,6 +484,66 @@ function vXodimlar(){
     <label>Parol (istalgan so'z yoki raqam)<input id="u_pin" required maxlength="30" autocapitalize="none" placeholder="masalan: 7 yoki ganiyev"></label>
     <div class="full row"><button class="pri">Qo'shish</button><span class="small muted">Xodim login va parol bilan kiradi, faqat o'z blokini ko'radi.</span></div>
   </form></section>`;
+}
+
+/* ---------- QARZLAR (tovar qarzga olingan) ---------- */
+let dFilter='ochiq', dSearch='';
+const money=(v,cur)=>cur==='usd'?usd(v):fmt(v)+" so'm";
+function vQarz(){
+  if(!canDebt()) return `<section class="panel"><div class="lock">Qarz kiritish sizga yoqilmagan. Rahbardan ruxsat so'rang.</div></section>`;
+  const q=dSearch.toLowerCase();
+  let list=S.debts.slice().reverse();
+  if(dFilter==='ochiq') list=list.filter(d=>!d.closed); else if(dFilter==='yopiq') list=list.filter(d=>d.closed);
+  if(q) list=list.filter(d=>(d.supplier+' '+d.phone+' '+d.type+' '+d.name).toLowerCase().includes(q));
+  const open=S.debts.filter(d=>!d.closed);
+  const leftUsd=open.filter(d=>d.cur==='usd').reduce((a,d)=>a+d.amount-d.paid,0), leftUzs=open.filter(d=>d.cur==='uzs').reduce((a,d)=>a+d.amount-d.paid,0);
+  const bySup={}; open.forEach(d=>{const k=d.supplier.trim().toLowerCase(); (bySup[k]=bySup[k]||{name:d.supplier,phone:d.phone,n:0,usd:0,uzs:0}); const b=bySup[k]; b.n++; b[d.cur]+=d.amount-d.paid; if(!b.phone&&d.phone)b.phone=d.phone;});
+  const sups=Object.values(bySup).sort((a,b)=>(b.usd*S.rate+b.uzs)-(a.usd*S.rate+a.uzs));
+  const today0=today();
+  return `<section class="panel"><h2>Qarzga tovar olish</h2><form id="debtF" class="form">
+    <label>Kimdan (firma yoki ism)<input id="d_sup" required list="supList" placeholder="Masalan: Ali optom"></label>
+    <datalist id="supList">${[...new Set(S.debts.map(d=>d.supplier))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+    <label>Telefon raqami<input id="d_phone" inputmode="tel" placeholder="+998 90 123 45 67"></label>
+    <label>Tovar turi<input id="d_type" list="typeList" placeholder="SSD, noutbuk, korpus…"></label>
+    <datalist id="typeList">${[...new Set(S.debts.map(d=>d.type).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+    <label>Tovar nomi<input id="d_name" required placeholder="Kingston A400 240GB"></label>
+    <label>Soni<input id="d_qty" type="number" min="1" value="1" required class="num"></label>
+    <label>Jami summa<input id="d_sum" type="number" min="0.01" step="0.01" required class="num"></label>
+    <label>Valyuta<select id="d_cur"><option value="usd">Dollar ($)</option><option value="uzs">So'm</option></select></label>
+    <label>To'lash muddati<input id="d_due" type="date"></label>
+    <label class="full">Izoh<input id="d_note" placeholder="ixtiyoriy"></label>
+    <div class="full row"><button class="pri">Qarzni yozish</button></div></form></section>
+  ${owner()?`<section class="panel"><h2>Umumiy qarz</h2><div class="stats">
+    <div class="stat"><div class="k">Dollarda qarz</div><div class="v">${usd(leftUsd)}</div></div>
+    <div class="stat"><div class="k">So'mda qarz</div><div class="v">${fmt(leftUzs)}</div></div>
+    <div class="stat"><div class="k">Jami (kurs bo'yicha)</div><div class="v">${fmt(leftUsd*S.rate+leftUzs)}</div></div>
+    <div class="stat"><div class="k">Ochiq qarzlar</div><div class="v">${open.length}</div></div></div>
+    ${sups.length?`<div class="tbl" style="margin-top:14px"><table><thead><tr><th>Kimdan</th><th>Telefon</th><th class="r">Ochiq</th><th class="r">Qoldiq $</th><th class="r">Qoldiq so'm</th></tr></thead><tbody>
+    ${sups.map(b=>`<tr><td class="who">${esc(b.name)}</td><td class="num">${esc(b.phone)}</td><td class="r num">${b.n}</td><td class="r num">${b.usd?usd(b.usd):'—'}</td><td class="r num">${b.uzs?fmt(b.uzs):'—'}</td></tr>`).join('')}
+    </tbody></table></div>`:''}</section>`:''}
+  <section class="panel"><div class="row" style="margin-bottom:10px">
+    <select id="dFilter" style="width:auto"><option value="ochiq">Ochiq qarzlar</option><option value="yopiq">To'langanlar</option><option value="hammasi">Hammasi</option></select>
+    <input id="dSearch" placeholder="Kimdan, telefon, tovar…" value="${esc(dSearch)}" style="flex:1;min-width:160px"></div>
+    <div class="tbl"><table><thead><tr><th>Sana</th><th>Kimdan</th><th>Tovar</th><th class="r">Summa</th><th class="r">To'langan</th><th class="r">Qoldiq</th><th></th></tr></thead><tbody>
+    ${list.map(d=>{const left=d.amount-d.paid, late=!d.closed&&d.due&&d.due<today0;
+      return `<tr><td class="num small">${dayOf(d.ts)}${d.due?`<div class="small ${late?'':'muted'}" style="${late?'color:var(--bad)':''}">muddat ${d.due}</div>`:''}</td>
+      <td class="who">${esc(d.supplier)}<div class="small muted num">${esc(d.phone)}</div></td>
+      <td>${d.type?`<span class="chip" style="font-size:11px;padding:1px 8px">${esc(d.type)}</span> `:''}${esc(d.name)} <span class="muted">× ${d.qty}</span>${d.note?`<div class="small muted">${esc(d.note)}</div>`:''}${owner()?`<div class="small muted">kiritdi: ${esc(uName(d.userId))}</div>`:''}</td>
+      <td class="r num">${money(d.amount,d.cur)}</td><td class="r num">${money(d.paid,d.cur)}</td>
+      <td class="r num">${d.closed?'<span class="status s-tayyor">To\'langan</span>':`<b>${money(left,d.cur)}</b>`}</td>
+      <td>${owner()?`<div class="row" style="flex-wrap:nowrap">${d.closed?'':`<button class="sm pri" data-paydebt="${d.id}">To'lash</button>`}<button class="sm ghost" data-deldebt="${d.id}" aria-label="O'chirish">✕</button></div>`:''}</td></tr>`}).join('')||'<tr><td colspan="7" class="muted">Qarz yo\'q</td></tr>'}
+    </tbody></table></div></section>`;
+}
+function payDebtModal(id){
+  const d=S.debts.find(x=>x.id===id), left=d.amount-d.paid;
+  const hist=S.debtPays.filter(p=>p.debtId===id);
+  modal(`<h3>${esc(d.supplier)}: qarzni to'lash</h3>
+  <p class="muted" style="margin:0">${esc(d.name)} × ${d.qty} · qoldiq <b>${money(left,d.cur)}</b></p>
+  ${hist.length?`<div class="small">${hist.map(p=>`<div class="kv" style="display:flex;justify-content:space-between"><span class="muted">${dayOf(p.ts)}${p.note?' · '+esc(p.note):''}</span><span class="num">${money(p.amount,d.cur)}</span></div>`).join('')}</div>`:''}
+  <form id="payDebtF" data-d="${d.id}" style="display:grid;gap:10px">
+    <label>To'lov summasi (${d.cur==='usd'?'$':"so'm"})<input id="pd_sum" type="number" min="0.01" step="0.01" max="${left}" value="${left}" required class="num"></label>
+    <label>Izoh<input id="pd_note" placeholder="naqd, karta…"></label>
+    <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">To'lash</button></div></form>`);
 }
 
 /* ---------- RASXODLAR ---------- */
@@ -530,11 +595,12 @@ function payModal(id){
 function modal(html){document.getElementById('modalRoot').innerHTML=`<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;}
 function closeModal(){document.getElementById('modalRoot').innerHTML='';}
 /* ---------- render & events ---------- */
-const views={rasxod:vRasxod,mening:vMening,xodimlar:vXodimlar,sotuv:vSotuv,ombor:vOmbor,ustaxona:vUstaxona,mijozlar:vMijozlar,hisobot:vHisobot,sozlamalar:vSozlamalar};
+const views={qarz:vQarz,rasxod:vRasxod,mening:vMening,xodimlar:vXodimlar,sotuv:vSotuv,ombor:vOmbor,ustaxona:vUstaxona,mijozlar:vMijozlar,hisobot:vHisobot,sozlamalar:vSozlamalar};
 function render(){
   header();
   document.getElementById('main').innerHTML=views[tab]();
   const rf=document.getElementById('rFilter'); if(rf) rf.value=rFilter;
+  const df=document.getElementById('dFilter'); if(df) df.value=dFilter;
 }
 function route(){const h=location.hash.slice(1); if(views[h]) tab=h; render(); if(tab==='sotuv') setTimeout(()=>document.getElementById('scanIn')?.focus(),0);}
 window.addEventListener('hashchange',route);
@@ -571,7 +637,7 @@ async function allRows(q) {
 async function refresh() {
   const uid = (await db.auth.getUser()).data.user?.id;
   const since = sinceIso();
-  const [st, profs, pays, prods, costs, cls, reps, sales, exps, pr] = await Promise.all([
+  const [st, profs, pays, prods, costs, cls, reps, sales, exps, pr, debts] = await Promise.all([
     must(db.from('settings').select('*').eq('id', 1).single()),
     must(db.from('profiles').select('*').order('created_at')),
     must(db.from('staff_pay').select('*')),
@@ -582,7 +648,10 @@ async function refresh() {
     allRows(() => db.from('sales').select('*, sale_items(*, sale_item_costs(*))').gte('created_at', since).order('created_at')),
     allRows(() => db.from('expenses').select('*').gte('created_at', since).order('created_at')),
     db.rpc('payroll', { p_month: today().slice(0, 7) }),
+    allRows(() => db.from('supplier_debts').select('*').or(`closed.eq.false,created_at.gte.${since}`).order('created_at')),
   ]);
+  const debtIds = debts.map((d) => d.id);
+  const dpays = debtIds.length ? await must(db.from('debt_payments').select('*').in('debt_id', debtIds).order('created_at')) : [];
   const payMap = Object.fromEntries(pays.map((p) => [p.user_id, p]));
   const costMap = Object.fromEntries(costs.map((c) => [c.product_id, +c.cost_usd]));
   S = {
@@ -591,7 +660,7 @@ async function refresh() {
     mods: st.mods, tg: st.tg, printers: st.printers,
     users: profs.map((p) => ({
       id: p.id, name: p.name, login: p.login, role: p.role, active: p.active,
-      canExpense: p.can_expense, seeSalary: p.see_salary,
+      canExpense: p.can_expense, seeSalary: p.see_salary, canDebt: p.can_debt,
       oklad: +(payMap[p.id]?.oklad || 0), kpi: +(payMap[p.id]?.kpi || 0), kpiBase: payMap[p.id]?.kpi_base || 'foyda',
     })),
     products: prods.map((p) => ({ id: p.id, name: p.name, barcode: p.barcode, line: p.line, qty: p.qty, sellUsd: +p.sell_usd, costUsd: costMap[p.id] ?? 0 })),
@@ -607,6 +676,9 @@ async function refresh() {
     })),
     expenses: exps.map((e) => ({ id: e.id, ts: ms(e.created_at), userId: e.user_id, cat: e.cat, amountUzs: +e.amount_uzs, note: e.note || '', toUser: e.to_user })),
     payroll: Object.fromEntries((pr.data || []).map((x) => [x.user_id, x])),
+    debts: debts.map((d) => ({ id: d.id, ts: ms(d.created_at), userId: d.user_id, supplier: d.supplier, phone: d.phone || '', type: d.item_type || '',
+      name: d.item_name, qty: d.qty, amount: +d.amount, cur: d.currency, due: d.due_date, note: d.note || '', paid: +d.paid, closed: d.closed })),
+    debtPays: dpays.map((x) => ({ id: x.id, debtId: x.debt_id, ts: ms(x.created_at), amount: +x.amount, note: x.note || '' })),
   };
   applySkin();
 }
@@ -768,6 +840,14 @@ document.addEventListener('submit', async (e) => {
       if (nt > 0) patch.next_talon = nt;
       await act(() => settingsUpd(patch), 'Saqlandi. Narxlar yangi kurs bo\'yicha hisoblanadi');
     }
+    if (id === 'debtF') {
+      await act(() => must(db.from('supplier_debts').insert({ user_id: S.cur, supplier: v('d_sup'), phone: v('d_phone'), item_type: v('d_type'), item_name: v('d_name'),
+        qty: +v('d_qty') || 1, amount: +v('d_sum'), currency: v('d_cur'), due_date: v('d_due') || null, note: v('d_note') })), 'Qarz yozildi');
+    }
+    if (id === 'payDebtF') {
+      await act(() => must(db.from('debt_payments').insert({ debt_id: e.target.dataset.d, user_id: S.cur, amount: +v('pd_sum'), note: v('pd_note') })), "To'lov yozildi");
+      closeModal();
+    }
     if (id === 'impClF') {
       const rows = v('imp_txt').split('\n').map((l) => l.split(/[;,\t]/).map((x) => x.trim())).filter((r) => r[0] && r[1]);
       const list = rows.map(([phone, name]) => ({ phone: phone.replace(/\s/g, ''), name }));
@@ -787,7 +867,7 @@ document.addEventListener('input', (e) => {
       .map((p) => `<button type="button" data-add="${p.id}"><span>${esc(p.name)} <span class="muted small">· ${p.qty} dona</span></span><span class="num">${fmt(priceUzs(p))}</span></button>`).join('');
   }
   const keep = (id, set) => { if (t.id !== id) return; set(t.value); const pos = t.selectionStart; render(); const n = document.getElementById(id); n.focus(); n.setSelectionRange(pos, pos); };
-  keep('oSearch', (x) => (oSearch = x)); keep('cSearch', (x) => (cSearch = x)); keep('rSearch', (x) => (rSearch = x));
+  keep('oSearch', (x) => (oSearch = x)); keep('cSearch', (x) => (cSearch = x)); keep('rSearch', (x) => (rSearch = x)); keep('dSearch', (x) => (dSearch = x));
   if (t.id === 'r_phone') { const c = S.clients.find((c) => c.phone === t.value.replace(/\s/g, '')); if (c) document.getElementById('r_name').value = c.name; }
   if (t.id === 'k_bar') {
     const p = S.products.find((p) => p.barcode === t.value.trim());
@@ -800,10 +880,11 @@ document.addEventListener('change', async (e) => {
   try {
     if (t.id === 'rFilter') { rFilter = t.value; render(); }
     if (t.id === 'eMonth') { eMonth = t.value; render(); }
+    if (t.id === 'dFilter') { dFilter = t.value; render(); }
     if (t.id && t.id.startsWith('sk_')) drawStickers(t.id === 'sk_size');
     if (['lb_size', 'lb_w', 'lb_h', 'lb_n', 'lb_price'].includes(t.id)) drawLabels(t.id === 'lb_size');
     if (t.dataset.perm) {
-      const col = t.dataset.perm === 'canExpense' ? 'can_expense' : 'see_salary';
+      const col = { canExpense: 'can_expense', seeSalary: 'see_salary', canDebt: 'can_debt' }[t.dataset.perm];
       await act(() => must(db.from('profiles').update({ [col]: t.checked }).eq('id', t.dataset.u)), t.checked ? 'Ruxsat yoqildi' : "Ruxsat o'chirildi");
     }
     if (t.dataset.mod) await act(() => settingsUpd({ mods: { ...S.mods, [t.dataset.mod]: t.checked } }), t.checked ? 'Modul yoqildi' : "Modul o'chirildi");
@@ -840,6 +921,13 @@ document.addEventListener('click', async (e) => {
       else { const p = S.products.find((x) => x.id === k.slice(1)); stickerModal({ line: p.line, warranty: p.line === 'noutbuk' || p.line === 'kompyuter' ? '12' : '0' }); }
     }
     if (b.id === 'genBar') { document.getElementById('k_bar').value = genBarcode(); document.getElementById('k_name').focus(); }
+    if (b.dataset.paydebt) payDebtModal(b.dataset.paydebt);
+    if (b.dataset.deldebt) {
+      const d = S.debts.find((x) => x.id === b.dataset.deldebt);
+      modal(`<h3>Qarz o'chirilsinmi?</h3><p class="muted" style="margin:0">${esc(d.supplier)} · ${esc(d.name)}. To'lovlar tarixi ham o'chadi.</p>
+        <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri" data-deldebtyes="${d.id}">Ha, o'chirish</button></div>`);
+    }
+    if (b.dataset.deldebtyes) { await act(() => must(db.from('supplier_debts').delete().eq('id', b.dataset.deldebtyes)), "Qarz o'chirildi"); closeModal(); }
     if (b.dataset.delexp) await act(() => must(db.from('expenses').delete().eq('id', b.dataset.delexp)), "Rasxod o'chirildi");
     if (b.dataset.skin) { S.skin = b.dataset.skin; try { localStorage.setItem('comtech_skin', S.skin); } catch {} applySkin(); render(); }
     if (b.dataset.view !== undefined) { viewUser = b.dataset.view || null; render(); window.scrollTo(0, 0); }

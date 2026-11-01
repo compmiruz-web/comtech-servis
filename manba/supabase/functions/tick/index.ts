@@ -96,7 +96,7 @@ async function all(db: Db, table: string) {
 
 async function sendBackup(db: Db, s: any, day: string) {
   const tables = ['settings', 'profiles', 'staff_pay', 'products', 'product_costs', 'stock_moves', 'clients',
-    'repairs', 'sales', 'sale_items', 'sale_item_costs', 'expenses'];
+    'repairs', 'sales', 'sale_items', 'sale_item_costs', 'expenses', 'supplier_debts', 'debt_payments'];
   const dump: Record<string, unknown[]> = {};
   for (const t of tables) dump[t] = await all(db, t);
   const body = JSON.stringify({ app: 'comtech-servis', version: 1, created: new Date().toISOString(), tables: dump });
