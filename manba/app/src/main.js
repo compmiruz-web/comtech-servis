@@ -34,6 +34,7 @@ const CATS={qism:'Ehtiyot qism',transport:'Transport',ovqat:'Ovqat',kommunal:'Ko
 const canExp=()=>S.mods.expenses&&(owner()||me().canExpense);
 const canReturn=()=>S.mods.returns!==false&&(owner()||me().canReturn);
 const canCredit=()=>S.mods.credit!==false&&(owner()||me().canCredit);
+const canStock=()=>owner()||(S.mods.stockin!==false&&me().canStock);
 const canDebt=()=>S.mods.debts!==false&&(owner()||me().canDebt);
 const monthOf=ts=>dayOf(ts).slice(0,7);
 function payroll(u){const p=S.payroll[u.id]||{};return {base:+p.base||0,kpiSum:+p.kpi_sum||0,total:+p.total||0,paid:+p.paid||0,left:+p.left_to_pay||0};}
@@ -317,15 +318,15 @@ function vOmbor(){
   const q=oSearch.toLowerCase();
   const list=S.products.filter(p=>!q||p.name.toLowerCase().includes(q)||p.barcode.includes(q));
   const stockVal=S.products.reduce((a,p)=>a+p.costUsd*p.qty,0);
-  return `${owner()?`<section class="panel"><h2>Kirim qilish</h2>
+  return `${canStock()?`<section class="panel"><h2>Kirim qilish</h2>
     <form id="kirimF" class="form">
       <label>Shtrix-kod<span class="row" style="flex-wrap:nowrap"><input id="k_bar" required inputmode="numeric" placeholder="Skanerlang"><button type="button" class="sm" id="genBar" title="Shtrix-kodi yo'q tovar uchun">Yaratish</button></span></label>
       <label class="full">Nomi<input id="k_name" required placeholder="Masalan: SSD Samsung 870 EVO 500GB"></label>
       <label>Yo'nalish (etiketka uchun)<select id="k_line"><option value="noutbuk">Noutbuk</option><option value="kompyuter" selected>Kompyuter / qism</option><option value="servis">Servis</option></select></label>
       <label>Soni<input id="k_qty" type="number" min="1" value="1" required></label>
-      <label>Kelish narxi ($)<input id="k_cost" type="number" step="0.01" min="0" required></label>
-      <label>Sotish narxi ($)<input id="k_sell" type="number" step="0.01" min="0" required></label>
-      <div class="full row"><button class="pri">Omborga qo'shish</button><span class="small muted" id="k_hint">Bor shtrix-kod kiritilsa, soni qo'shiladi va narx yangilanadi.</span></div>
+      <label>Kelish narxi ($)<input id="k_cost" type="number" step="0.01" min="0" ${owner()?'required':'placeholder="Mavjud tovarda bo\'sh qoldiring"'}></label>
+      <label>Sotish narxi ($)<input id="k_sell" type="number" step="0.01" min="0" ${owner()?'required':'placeholder="Mavjud tovarda bo\'sh qoldiring"'}></label>
+      <div class="full row"><button class="pri">Omborga qo'shish</button><span class="small muted" id="k_hint">${owner()?"Bor shtrix-kod kiritilsa, soni qo'shiladi va narx yangilanadi.":"Bor tovar skanerlansa, faqat soni qo'shiladi; narxni bo'sh qoldirsangiz eski narx qoladi. Yangi tovarga ikkala narx shart."}</span></div>
     </form></section>`:''}
   <section class="panel">
     <div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Tovarlar qoldig'i</h2>
@@ -337,7 +338,7 @@ function vOmbor(){
     ${owner()?`<td class="r num">${usd(p.costUsd)}</td><td class="r num">${usd(p.sellUsd)}</td>`:''}
     <td class="r num">${fmt(priceUzs(p))}</td><td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-label="${p.id}">Etiketka</button><button class="sm" data-stk="p${p.id}">Yopishtirgich</button></div></td></tr>`).join('')}
     </tbody></table></div>
-    ${owner()?'':'<div class="lock" style="margin-top:12px">Kelish narxi va kirim faqat rahbar rejimida ko\'rinadi.</div>'}
+    ${owner()?'':`<div class="lock" style="margin-top:12px">${canStock()?'Kelish narxlari faqat rahbarga ko\'rinadi.':'Kelish narxi va kirim faqat rahbar rejimida ko\'rinadi.'}</div>`}
   </section>`;
 }
 
@@ -359,7 +360,7 @@ function vUstaxona(){
       <label>Komplekt<input id="r_acc" placeholder="Zaryadka, sumka…"></label>
       <label class="full">Nosozlik sababi<textarea id="r_prob" required placeholder="Mijoz aytgan muammo"></textarea></label>
       <label>Taxminiy narx (so'm)<input id="r_fee" type="number" min="0" step="1000"></label>
-      <label>Usta<select id="r_master">${S.users.filter(u=>u.role==='usta'&&u.active).map(u=>`<option value="${u.id}" ${u.id===S.cur?'selected':''}>${esc(u.name)}</option>`).join('')}</select></label>
+      <label>Usta<select id="r_master">${S.users.filter(u=>(u.role==='usta'||u.role==='owner')&&u.active).map(u=>`<option value="${u.id}" ${u.id===S.cur?'selected':''}>${esc(u.name)}${u.role==='owner'?' (o\'zim)':''}</option>`).join('')}</select></label>
       <div class="full row"><button class="pri">Qabul qilish va talon chiqarish</button></div>
     </form></section>
   <section class="panel">
@@ -469,6 +470,7 @@ function vSozlamalar(){
     <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" data-mod="debts" ${S.mods.debts!==false?'checked':''} style="width:auto"> Tovar qarzlari</label>
     <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" data-mod="returns" ${S.mods.returns!==false?'checked':''} style="width:auto"> Vazvrat (tovarni qaytarish)</label>
     <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" data-mod="credit" ${S.mods.credit!==false?'checked':''} style="width:auto"> Nasiya (mijozlar qarzi)</label>
+    <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" data-mod="stockin" ${S.mods.stockin!==false?'checked':''} style="width:auto"> Xodimlar omborga tovar qo'shishi</label>
     <p class="small muted" style="margin:0">O'chirilgan modul hech kimga, xodimlarga ham ko'rinmaydi. Ma'lumotlar o'chmaydi.</p></div></section>`:''}
   ${owner()?`<section class="panel"><h2>Printerlar</h2><form id="prF" class="form">
     <label>Chek va talon printeri<input id="pr_r" value="${esc(S.printers.receipt)}"></label>
@@ -541,13 +543,14 @@ function vXodimlar(){
     <td><div class="row" style="flex-wrap:nowrap">${u.role!=='owner'?`<button class="sm" data-view="${u.id}">Blokini ko'rish</button><button class="sm" data-setpin="${u.id}">Tahrirlash</button>${u.active?`<button class="sm ghost" data-active="0" data-u="${u.id}">O'chirish</button>`:`<button class="sm" data-active="1" data-u="${u.id}">Yoqish</button>`}`:''}</div></td></tr>`}).join('')}
   </tbody></table></div></section>
   <section class="panel"><h2>Ruxsatlar</h2>
-  <div class="tbl"><table><thead><tr><th>Xodim</th><th>Rasxod kiritish</th><th>Oyligini ko'rish</th><th>Qarz kiritish</th><th>Vazvrat</th><th>Nasiya</th></tr></thead><tbody>
+  <div class="tbl"><table><thead><tr><th>Xodim</th><th>Rasxod kiritish</th><th>Oyligini ko'rish</th><th>Qarz kiritish</th><th>Vazvrat</th><th>Nasiya</th><th>Omborga kirim</th></tr></thead><tbody>
   ${S.users.filter(u=>u.role!=='owner'&&u.active).map(u=>`<tr><td>${esc(u.name)}</td>
     <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canExpense" data-u="${u.id}" ${u.canExpense?'checked':''} ${S.mods.expenses?'':'disabled'} style="width:auto"> ${u.canExpense?'Yoqilgan':"O'chiq"}</label></td>
     <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="seeSalary" data-u="${u.id}" ${u.seeSalary?'checked':''} ${S.mods.salary?'':'disabled'} style="width:auto"> ${u.seeSalary?'Yoqilgan':"O'chiq"}</label></td>
     <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canDebt" data-u="${u.id}" ${u.canDebt?'checked':''} ${S.mods.debts!==false?'':'disabled'} style="width:auto"> ${u.canDebt?'Yoqilgan':"O'chiq"}</label></td>
     <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canReturn" data-u="${u.id}" ${u.canReturn?'checked':''} ${S.mods.returns!==false?'':'disabled'} style="width:auto"> ${u.canReturn?'Yoqilgan':"O'chiq"}</label></td>
-    <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canCredit" data-u="${u.id}" ${u.canCredit?'checked':''} ${S.mods.credit!==false?'':'disabled'} style="width:auto"> ${u.canCredit?'Yoqilgan':"O'chiq"}</label></td></tr>`).join('')}
+    <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canCredit" data-u="${u.id}" ${u.canCredit?'checked':''} ${S.mods.credit!==false?'':'disabled'} style="width:auto"> ${u.canCredit?'Yoqilgan':"O'chiq"}</label></td>
+    <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canStock" data-u="${u.id}" ${u.canStock?'checked':''} ${S.mods.stockin!==false?'':'disabled'} style="width:auto"> ${u.canStock?'Yoqilgan':"O'chiq"}</label></td></tr>`).join('')}
   </tbody></table></div>
   ${!S.mods.expenses||!S.mods.salary?'<p class="small muted">O\'chirilgan modullar Sozlamalarda yoqiladi.</p>':''}</section>
   ${S.mods.salary?`<section class="panel"><h2>Oylik hisobi · ${today().slice(0,7)}</h2>
@@ -842,7 +845,7 @@ async function refresh() {
     mods: st.mods, tg: st.tg, printers: st.printers,
     users: profs.map((p) => ({
       id: p.id, name: p.name, login: p.login, role: p.role, active: p.active,
-      canExpense: p.can_expense, seeSalary: p.see_salary, canDebt: p.can_debt, canReturn: p.can_return, canCredit: p.can_credit,
+      canExpense: p.can_expense, seeSalary: p.see_salary, canDebt: p.can_debt, canReturn: p.can_return, canCredit: p.can_credit, canStock: p.can_stock,
       oklad: +(payMap[p.id]?.oklad || 0), kpi: +(payMap[p.id]?.kpi || 0), kpiBase: payMap[p.id]?.kpi_base || 'foyda',
     })),
     products: prods.map((p) => ({ id: p.id, name: p.name, barcode: p.barcode, line: p.line, qty: p.qty, sellUsd: +p.sell_usd, costUsd: costMap[p.id] ?? 0 })),
@@ -982,7 +985,7 @@ document.addEventListener('submit', async (e) => {
     }
     if (id === 'kirimF') {
       const q = +v('k_qty'), name = v('k_name');
-      await act(() => db.rpc('stock_in', { p_barcode: v('k_bar'), p_name: name, p_line: v('k_line'), p_qty: q, p_cost: +v('k_cost'), p_sell: +v('k_sell') }).then(must0), `${name}: +${q} dona`);
+      await act(() => db.rpc('stock_in', { p_barcode: v('k_bar'), p_name: name, p_line: v('k_line'), p_qty: q, p_cost: v('k_cost') === '' ? null : +v('k_cost'), p_sell: v('k_sell') === '' ? null : +v('k_sell') }).then(must0), `${name}: +${q} dona`);
     }
     if (id === 'qabulF') {
       const r = await act(() => must(db.rpc('intake_repair', { p: {
@@ -1097,7 +1100,7 @@ document.addEventListener('input', (e) => {
   if (t.id === 'r_phone') { const c = S.clients.find((c) => c.phone === t.value.replace(/\s/g, '')); if (c) document.getElementById('r_name').value = c.name; }
   if (t.id === 'k_bar') {
     const p = S.products.find((p) => p.barcode === t.value.trim());
-    if (p) { k_name.value = p.name; k_line.value = p.line || 'kompyuter'; k_cost.value = p.costUsd; k_sell.value = p.sellUsd; k_hint.textContent = `Mavjud tovar: omborda ${p.qty} dona`; }
+    if (p) { k_name.value = p.name; k_line.value = p.line || 'kompyuter'; if (owner()) { k_cost.value = p.costUsd; k_sell.value = p.sellUsd; } k_hint.textContent = `Mavjud tovar: omborda ${p.qty} dona`; }
   }
 });
 
@@ -1116,7 +1119,7 @@ document.addEventListener('change', async (e) => {
     if (t.id && t.id.startsWith('sk_')) drawStickers(t.id === 'sk_size');
     if (['lb_size', 'lb_w', 'lb_h', 'lb_n', 'lb_price'].includes(t.id)) drawLabels(t.id === 'lb_size');
     if (t.dataset.perm) {
-      const col = { canExpense: 'can_expense', seeSalary: 'see_salary', canDebt: 'can_debt', canReturn: 'can_return', canCredit: 'can_credit' }[t.dataset.perm];
+      const col = { canExpense: 'can_expense', seeSalary: 'see_salary', canDebt: 'can_debt', canReturn: 'can_return', canCredit: 'can_credit', canStock: 'can_stock' }[t.dataset.perm];
       await act(() => must(db.from('profiles').update({ [col]: t.checked }).eq('id', t.dataset.u)), t.checked ? 'Ruxsat yoqildi' : "Ruxsat o'chirildi");
     }
     if (t.dataset.mod) await act(() => settingsUpd({ mods: { ...S.mods, [t.dataset.mod]: t.checked } }), t.checked ? 'Modul yoqildi' : "Modul o'chirildi");
