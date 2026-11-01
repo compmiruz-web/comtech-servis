@@ -56,6 +56,8 @@ const brandHtml=()=>{const n=esc(S.company.name||'');const i=n.indexOf('-');retu
 const LINE_NAMES={servis:'Servis',noutbuk:'Noutbuklar',kompyuter:'Kompyuterlar (korpus, gaming, qismlar)'};
 const LINE_SHORT={servis:'Servis',noutbuk:'Noutbuk',kompyuter:'Kompyuter'};
 const lineOf=k=>S.company.lines[k]||S.company.lines.kompyuter;
+// Yo'nalish brendi: NOUTBUK SAVDOSI, KOMPYUTER.UZ; bo'sh bo'lsa kompaniya nomi
+const brandOf=k=>(lineOf(k).brand||'').trim()||S.company.name;
 const contactsHtml=k=>{const c=lineOf(k);return `<div class="contacts">${c.phone?`<b>Tel: ${esc(c.phone)}</b><br>`:''}${[c.telegram&&'TG '+esc(c.telegram),c.instagram&&'IG '+esc(c.instagram)].filter(Boolean).join(' · ')}</div>`;};
 const PRESETS=['58x40','58x30','50x30','40x30','30x20','70x50'];
 function sizeOpts(cur){return PRESETS.map(z=>`<option value="${z}" ${z===cur?'selected':''}>${z.replace('x',' × ')} mm</option>`).join('')+`<option value="custom" ${PRESETS.includes(cur)?'':'selected'}>Qo'lda kiritish</option>`;}
@@ -68,7 +70,7 @@ function readSize(pre,fromSel){const g=x=>document.getElementById(pre+'_'+x);
   const [w,h]=dims(g('w').value+'x'+g('h').value); const m=w+'x'+h; if(PRESETS.includes(m)) g('size').value=m; else g('size').value='custom'; return m;}
 function labelHtml(p,size,price){const c=lineOf(p.line);
   const [w,h]=dims(size), fs=Math.max(6.5,Math.min(w*.215,h*.31)).toFixed(1);
-  return `<div class="label" style="width:${w}mm;height:${h}mm;font-size:${fs}px;--bch:${(h*.21).toFixed(1)}mm"><div class="lt"><span>${esc(S.company.name)}</span><span>${esc(c.phone)}</span></div>
+  return `<div class="label" style="width:${w}mm;height:${h}mm;font-size:${fs}px;--bch:${(h*.21).toFixed(1)}mm"><div class="lt"><span>${esc(brandOf(p.line))}</span><span>${esc(c.phone)}</span></div>
   <div class="ln">${esc(p.name)}</div>${price?`<div class="lp">${fmt(priceUzs(p))} <span style="font-size:.5em">so'm</span></div>`:''}
   <div>${code128Svg(p.barcode,40)}<div class="bn">${esc(p.barcode)}</div></div>
   <div class="lf">${c.telegram?`<div><b>Telegram</b> ${esc(c.telegram)}</div>`:''}${c.instagram?`<div><b>Instagram</b> ${esc(c.instagram)}</div>`:''}</div></div>`;}
@@ -83,9 +85,9 @@ function labelModal(id){
   <p class="small muted" style="margin:0">Printer: ${esc(S.printers.label)}. Narx qo'yilsa, u bugungi kurs bo'yicha bo'ladi.</p>
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button>${printBtn('labels')}</div>`);
 }
-function receiptModal(sale){const c=S.company;
+function receiptModal(sale){const c=S.company; const bl=sale.items[0]?.line||'kompyuter', bn=brandOf(bl);
   modal(`<h3>Sotuv cheki</h3><div class="ticket" ${tkAttr()}>
-  <div class="hd"><b>${esc(c.name)}</b><br>${esc(c.sub)}</div><hr>
+  <div class="hd"><b>${esc(bn)}</b><br>${bn!==c.name?esc(c.name)+' · ':''}${esc(c.sub)}</div><hr>
   <div class="kv"><span>Sana:</span><span>${new Date(sale.ts).toLocaleString('uz',{dateStyle:'short',timeStyle:'short'})}</span></div>
   <div class="kv"><span>Chek №:</span><span>${sale.no||''}</span></div>
   <div class="kv"><b>Chek berdi:</b><b>${esc(uName(sale.userId))}</b></div><hr>
@@ -101,7 +103,7 @@ function stickerHtml(o){const c=lineOf(o.line); const q=o.qr&&c.telegram?qrSvg(t
   let till='';if(+o.warranty){const d=new Date(o.from||Date.now());d.setMonth(d.getMonth()+(+o.warranty));till=d.toLocaleDateString('uz');}
   const [w,h]=dims(o.size), fs=Math.max(6,Math.min(w*.19,h*.275)).toFixed(1);
   return `<div class="stk ${q?'':'noqr'}" style="width:${w}mm;height:${h}mm;font-size:${fs}px;--qr:${Math.min(h*.36,w*.25).toFixed(1)}mm">
-  <div><div class="sb">${esc(S.company.name)}</div><div class="ss">${STK_TITLE[o.line]||''}</div>
+  <div><div class="sb">${esc(brandOf(o.line))}</div><div class="ss">${brandOf(o.line)!==S.company.name?esc(S.company.name):(STK_TITLE[o.line]||'')}</div>
   <div class="sp">${esc(c.phone)}</div><div class="so">${c.telegram?'TG '+esc(c.telegram):''}<br>${c.instagram?'IG '+esc(c.instagram):''}</div></div>
   ${q?`<div class="qr">${q}</div>`:''}
   <div class="sf"><span>${till?'Kafolat: '+till+' gacha':'Servis uchun murojaat qiling'}</span><span>${o.ref?esc(o.ref):''}</span></div></div>`;}
@@ -342,7 +344,7 @@ function vUstaxona(){
 function tkAttr(){const w=Math.min(120,Math.max(40,+S.printers.receiptW||80));return `data-w="${w>=70?80:58}" style="width:${w}mm"`;}
 function ticketHtml(r){
   return `<div class="ticket" ${tkAttr()}>
-  <div class="hd"><b>${esc(S.company.name)}</b><br>${esc(S.company.sub)}</div><hr>
+  <div class="hd"><b>${esc(brandOf('servis'))}</b><br>${esc(S.company.sub)}</div><hr>
   <div class="tn"><span>TALON</span><span class="bigno">№${r.talon}</span></div>
   <div class="kv"><span>${new Date(r.ts).toLocaleDateString('uz')}</span><span>${new Date(r.ts).toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'})}</span></div>
   ${code128Svg('T'+r.talon,30)}<hr>
@@ -407,7 +409,8 @@ function vSozlamalar(){
     <label>Qisqa izoh<input id="c_sub" value="${esc(S.company.sub)}"></label>
     ${Object.keys(LINE_NAMES).map(k=>{const c=lineOf(k);return `<div class="full" style="display:grid;gap:8px;padding:12px;border:1px dashed var(--line);border-radius:10px">
       <b style="font-size:14px">${LINE_NAMES[k]} <span class="muted small" style="font-weight:400">· ${k==='servis'?'remont talonida chiqadi':'shu yo\'nalishdagi etiketka va chekda chiqadi'}</span></b>
-      <div class="form"><label>Telefon<input id="c_${k}_phone" value="${esc(c.phone)}" inputmode="tel"></label>
+      <div class="form"><label>Nomi (etiketka va chekda)<input id="c_${k}_brand" value="${esc(c.brand||'')}" placeholder="${esc(S.company.name)}"></label>
+      <label>Telefon<input id="c_${k}_phone" value="${esc(c.phone)}" inputmode="tel"></label>
       <label>Telegram<input id="c_${k}_tg" value="${esc(c.telegram)}" placeholder="@kanal"></label>
       <label>Instagram<input id="c_${k}_ig" value="${esc(c.instagram)}" placeholder="@sahifa"></label></div></div>`;}).join('')}
     <label class="full row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" id="c_lblprice" ${S.company.labelPrice?'checked':''} style="width:auto"> Etiketkada narx odatda ko'rsatilsin</label>
@@ -777,7 +780,7 @@ const printBtn = (what) => `<button type="button" class="pri" data-print="${what
 /* ---------- kirish ekrani ---------- */
 function showSetup() {
   document.getElementById('gate').innerHTML = `<form id="cfgF" class="gate-card">
-    <div class="gate-mark">COM<i>-</i>TECH</div><h1>Bazaga ulash</h1>
+    <div class="gate-mark">COMPMIR</div><h1>Bazaga ulash</h1>
     <p class="muted small">Bir marta kiritiladi. Supabase → Project Settings → API bo'limidan oling.</p>
     <label>Project URL<input id="cf_url" required placeholder="https://xxxx.supabase.co"></label>
     <label>Anon (public) key<input id="cf_key" required placeholder="eyJ... yoki sb_publishable_..."></label>
@@ -786,7 +789,7 @@ function showSetup() {
 }
 function showLogin(err) {
   document.getElementById('gate').innerHTML = `<form id="loginF" class="gate-card">
-    <div class="gate-mark">${S?.company ? brandHtml() : 'COM<i>-</i>TECH'}</div><h1>Tizimga kirish</h1>
+    <div class="gate-mark">${S?.company ? brandHtml() : 'COMPMIR'}</div><h1>Tizimga kirish</h1>
     <label>Login<input id="li_login" required autocomplete="username" autocapitalize="none" placeholder="masalan: aziz"></label>
     <label>PIN yoki parol<input id="li_pin" type="password" required autocomplete="current-password"></label>
     ${err ? `<p class="small" style="color:var(--bad);margin:0">${esc(err)}</p>` : ''}
@@ -881,7 +884,7 @@ document.addEventListener('submit', async (e) => {
       closeModal();
     }
     if (id === 'compF') {
-      const lines = {}; for (const k of Object.keys(LINE_NAMES)) lines[k] = { phone: v(`c_${k}_phone`), telegram: v(`c_${k}_tg`), instagram: v(`c_${k}_ig`) };
+      const lines = {}; for (const k of Object.keys(LINE_NAMES)) lines[k] = { brand: v(`c_${k}_brand`), phone: v(`c_${k}_phone`), telegram: v(`c_${k}_tg`), instagram: v(`c_${k}_ig`) };
       await act(() => settingsUpd({ company: { ...S.company, name: v('c_name'), sub: v('c_sub'), labelPrice: document.getElementById('c_lblprice').checked, lines } }), 'Firma ma\'lumotlari saqlandi');
     }
     if (id === 'prF') {
