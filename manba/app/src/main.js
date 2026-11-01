@@ -904,10 +904,11 @@ async function refresh() {
   const debtIds = debts.map((d) => d.id);
   const dpays = debtIds.length ? await must(db.from('debt_payments').select('*').in('debt_id', debtIds).order('created_at')) : [];
   const isOwn = profs.some((p) => p.id === uid && p.role === 'owner');
+  const soft = (pr) => Promise.resolve(pr).then((r) => (r.error ? [] : r.data || []), () => []);
   const [salPays, notifs, monthR] = await Promise.all([
-    must(db.from('expenses').select('*').eq('cat', 'oylik').order('created_at', { ascending: false }).limit(1000)),
-    isOwn ? must(db.from('notifications').select('*').order('created_at', { ascending: false }).limit(150)) : Promise.resolve([]),
-    isOwn ? db.rpc('month_summary', { p_month: today().slice(0, 7) }) : Promise.resolve({ data: null }),
+    soft(db.from('expenses').select('*').eq('cat', 'oylik').order('created_at', { ascending: false }).limit(1000)),
+    isOwn ? soft(db.from('notifications').select('*').order('created_at', { ascending: false }).limit(150)) : Promise.resolve([]),
+    isOwn ? Promise.resolve(db.rpc('month_summary', { p_month: today().slice(0, 7) })).catch(() => ({ data: null })) : Promise.resolve({ data: null }),
   ]);
   if (S?.notifs && isOwn) {
     const known = new Set(S.notifs.map((n) => n.id + ':' + n.ts));
@@ -1098,7 +1099,7 @@ document.addEventListener('submit', async (e) => {
       const uidv = e.target.dataset.u, pay = +v('p_pay') || 0;
       await act(async () => {
         await must(db.from('staff_pay').upsert({ user_id: uidv, oklad: +v('p_oklad') || 0, kpi: +v('p_kpi') || 0, kpi_base: v('p_base') || 'foyda' }));
-        if (pay > 0) await must(db.from('expenses').insert({ user_id: S.cur, cat: 'oylik', amount_uzs: pay, to_user: uidv, note: 'Oylik', pay: 'naqd' }));
+        if (pay > 0) await must(db.from('expenses').insert({ user_id: S.cur, cat: 'oylik', amount_uzs: pay, to_user: uidv, note: 'Oylik' }));
       }, pay > 0 ? `${fmt(pay)} so'm to'landi` : 'Saqlandi');
       closeModal();
     }
