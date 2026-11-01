@@ -186,7 +186,8 @@ function header(){
   document.getElementById('footSoc').textContent=lineOf('servis').telegram||'';
   const stale=S.rateDate!==today();
   chip.className='chip '+(stale?'warn':'ok');
-  chip.innerHTML=`1$ = <span class="num">${fmt(S.rate)}</span> so'm${stale?' · bugun yangilanmagan':''}`;
+  chip.innerHTML=`1$ = <span class="num">${fmt(S.rate)}</span> so'm${stale?' · bugun yangilanmagan':''}${owner()?' <span aria-hidden="true">✎</span>':''}`;
+  chip.title=owner()?"Kursni o'zgartirish uchun bosing":'';
   document.getElementById('roleBtn').innerHTML=`<span class="ava">${esc(me().name.trim()[0]||'?').toUpperCase()}</span><span><span class="who">${esc(me().name)}</span> <span class="muted small">· ${ROLES[me().role]}</span></span>`;
   const tabs=[['mening','Mening blokim'],['sotuv','Sotuv'],['ombor','Ombor'],['ustaxona','Ustaxona'],['mijozlar','Mijozlar']];
   if(canExp()) tabs.push(['rasxod','Rasxodlar']);
@@ -894,6 +895,10 @@ document.addEventListener('submit', async (e) => {
     if (id === 'tgF') {
       await act(() => settingsUpd({ tg: { group: v('tg_group'), channel: v('tg_ch'), reportTime: v('tg_rt') || '21:00', backupTime: v('tg_bt') || '00:00', profit: document.getElementById('tg_profit').checked } }), 'Telegram sozlamalari saqlandi');
     }
+    if (id === 'rateF') {
+      const nr = +v('rf_rate'); if (!(nr > 0)) return toast("Kursni to'g'ri kiriting");
+      await act(() => settingsUpd({ rate: nr, rate_date: today() }), `Kurs saqlandi: 1$ = ${fmt(nr)} so'm`); closeModal();
+    }
     if (id === 'setF') {
       const nr = +v('s_rate'), nt = +v('s_talon'), patch = {};
       if (nr > 0) { patch.rate = nr; patch.rate_date = today(); }
@@ -984,6 +989,14 @@ document.addEventListener('click', async (e) => {
   if (!b) return;
   try {
     if (b.id === 'roleBtn') accountModal();
+    if (b.id === 'rateChip') {
+      if (!owner()) return toast("Kursni faqat rahbar o'zgartiradi");
+      modal(`<h3>Bugungi dollar kursi</h3><form id="rateF" style="display:grid;gap:10px">
+        <label>1 $ = necha so'm<input id="rf_rate" type="number" min="1" step="1" required value="${S.rate}" class="num" style="font-size:22px"></label>
+        <p class="small muted" style="margin:0">Saqlangach, barcha tovarlarning so'mdagi narxi yangi kurs bo'yicha hisoblanadi.</p>
+        <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div></form>`);
+      setTimeout(() => { const i = document.getElementById('rf_rate'); i?.focus(); i?.select(); }, 0);
+    }
     if (b.id === 'logoutBtn') { await db.auth.signOut(); closeModal(); cart = []; location.hash = ''; showLogin(); }
     if (b.dataset.pay) payModal(b.dataset.pay);
     if (b.dataset.label) labelModal(b.dataset.label);

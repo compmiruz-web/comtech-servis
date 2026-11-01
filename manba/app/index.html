@@ -85,7 +85,8 @@ main{margin-top:20px;display:grid;gap:18px}
 .chip.ok{background:var(--accent-soft);color:var(--ok);border-color:transparent}
 .chip.bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}
 .chip.info{background:var(--info-soft);color:var(--info);border-color:transparent}
-#rateChip{font-weight:500}
+#rateChip{font-weight:500;font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+#rateChip:hover{filter:brightness(.97)}
 #roleBtn{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:5px 12px 5px 5px}
 .ava{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);font-family:var(--display);font-size:11px;font-weight:600}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
@@ -240,7 +241,7 @@ body{margin:0}
     <div class="mobmark"><b id="brandMob"></b></div>
     <header class="bar">
       <div><div class="eyebrow" id="pageDate"></div><h1 id="pageTitle"></h1></div>
-      <div class="topr"><span id="rateChip" class="chip"></span><button id="roleBtn"></button></div>
+      <div class="topr"><button id="rateChip" class="chip" type="button"></button><button id="roleBtn"></button></div>
     </header>
     <main id="main"></main>
   </div>
