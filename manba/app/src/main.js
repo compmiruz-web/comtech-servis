@@ -456,7 +456,7 @@ function vXodimlar(){
     if(u.role==='usta'){const m=S.repairs.filter(r=>r.masterId===u.id);a=m.filter(r=>r.status!=='berildi').length+' ishda';b=m.filter(r=>r.status==='berildi'&&r.doneTs&&dayOf(r.doneTs).startsWith(mon)).length+' topshirildi';}
     if(u.role==='sotuvchi'){const m=S.sales.filter(s=>s.userId===u.id);a=fmt(m.filter(s=>dayOf(s.ts)===today()).reduce((x,s)=>x+s.totalUzs,0));b=fmt(m.filter(s=>dayOf(s.ts).startsWith(mon)).reduce((x,s)=>x+s.totalUzs,0));}
     return `<tr><td class="who">${esc(u.name)}</td><td>${ROLES[u.role]}</td><td class="r num">${a}</td><td class="r num">${b}</td><td class="num">${esc(u.login||'')}${u.active?'':' <span class="chip bad" style="font-size:11px;padding:1px 8px">o\'chirilgan</span>'}</td>
-    <td><div class="row" style="flex-wrap:nowrap">${u.role!=='owner'?`<button class="sm" data-view="${u.id}">Blokini ko'rish</button><button class="sm" data-setpin="${u.id}">PIN</button>${u.active?`<button class="sm ghost" data-active="0" data-u="${u.id}">O'chirish</button>`:`<button class="sm" data-active="1" data-u="${u.id}">Yoqish</button>`}`:''}</div></td></tr>`}).join('')}
+    <td><div class="row" style="flex-wrap:nowrap">${u.role!=='owner'?`<button class="sm" data-view="${u.id}">Blokini ko'rish</button><button class="sm" data-setpin="${u.id}">Tahrirlash</button>${u.active?`<button class="sm ghost" data-active="0" data-u="${u.id}">O'chirish</button>`:`<button class="sm" data-active="1" data-u="${u.id}">Yoqish</button>`}`:''}</div></td></tr>`}).join('')}
   </tbody></table></div></section>
   <section class="panel"><h2>Ruxsatlar</h2>
   <div class="tbl"><table><thead><tr><th>Xodim</th><th>Rasxod kiritish</th><th>Oyligini ko'rish</th></tr></thead><tbody>
@@ -475,8 +475,8 @@ function vXodimlar(){
   <section class="panel"><h2>Yangi xodim qo'shish</h2><form id="userF" class="form">
     <label>Ism<input id="u_name" required></label>
     <label>Lavozim<select id="u_role"><option value="usta">Usta</option><option value="sotuvchi">Sotuvchi</option></select></label>
-    <label>Login (lotin harf)<input id="u_login" required pattern="[a-z0-9_.]{3,20}" autocapitalize="none" placeholder="aziz"></label>
-    <label>PIN (6-12 raqam)<input id="u_pin" required inputmode="numeric" pattern="\d{6,12}"></label>
+    <label>Login (istalgan so'z)<input id="u_login" required maxlength="30" autocapitalize="none" placeholder="aziz"></label>
+    <label>PIN (istalgan raqam, 1-12 ta)<input id="u_pin" required inputmode="numeric" pattern="\d{1,12}" placeholder="masalan: 7"></label>
     <div class="full row"><button class="pri">Qo'shish</button><span class="small muted">Xodim login va PIN bilan kiradi, faqat o'z blokini ko'radi.</span></div>
   </form></section>`;
 }
@@ -548,6 +548,16 @@ function getCfg() {
 }
 let db = null;
 const DOMAIN = 'comtech.app';
+// Login istalgan matn bo'lishi mumkin: lotin bo'lmasa, emailga xavfsiz ko'rinishda o'giriladi
+const normLogin = (l) => String(l || '').trim().toLowerCase();
+function loginToEmail(l) {
+  l = normLogin(l);
+  if (l.includes('@')) return l;
+  if (/^[a-z0-9._-]{1,40}$/.test(l)) return `${l}@${DOMAIN}`;
+  return 'x' + [...new TextEncoder().encode(l)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 60) + '@' + DOMAIN;
+}
+// Supabase kamida 6 belgi talab qiladi: qisqa PIN ichkarida uzaytiriladi (server bilan bir xil)
+const pinPw = (pin) => `ct#${String(pin).trim()}#pin`;
 const sinceIso = () => new Date(Date.now() - 62 * 864e5).toISOString();
 const ms = (t) => (t ? Date.parse(t) : null);
 const one = (x) => (Array.isArray(x) ? x[0] : x);
@@ -696,9 +706,10 @@ document.addEventListener('submit', async (e) => {
       return boot();
     }
     if (id === 'loginF') {
-      const login = v('li_login').toLowerCase();
-      const email = login.includes('@') ? login : `${login}@${DOMAIN}`;
-      const { error } = await db.auth.signInWithPassword({ email, password: document.getElementById('li_pin').value });
+      const email = loginToEmail(v('li_login'));
+      const raw = document.getElementById('li_pin').value;
+      let { error } = await db.auth.signInWithPassword({ email, password: pinPw(raw) });
+      if (error && raw.length >= 6) ({ error } = await db.auth.signInWithPassword({ email, password: raw }));
       if (error) return showLogin('Login yoki PIN noto\'g\'ri');
       return enter();
     }
@@ -724,7 +735,8 @@ document.addEventListener('submit', async (e) => {
       await act(() => adminUsers({ action: 'create', name: v('u_name'), login: v('u_login'), role: v('u_role'), pin: v('u_pin') }), 'Xodim qo\'shildi');
     }
     if (id === 'pinSetF') {
-      await adminUsers({ action: 'set_pin', user_id: e.target.dataset.u, pin: v('ps_pin') }); closeModal(); toast('PIN almashtirildi');
+      await act(() => adminUsers({ action: 'update', user_id: e.target.dataset.u, name: v('ps_name'), login: v('ps_login'), pin: v('ps_pin') }), 'Xodim ma\'lumotlari saqlandi');
+      closeModal();
     }
     if (id === 'expF') {
       const to = v('e_to');
@@ -834,8 +846,10 @@ document.addEventListener('click', async (e) => {
     if (b.dataset.active) await act(() => adminUsers({ action: 'set_active', user_id: b.dataset.u, active: b.dataset.active === '1' }), b.dataset.active === '1' ? 'Xodim yoqildi' : "Xodim o'chirildi");
     if (b.dataset.setpin) {
       const u = S.users.find((x) => x.id === b.dataset.setpin);
-      modal(`<h3>${esc(u.name)}: yangi PIN</h3><form id="pinSetF" data-u="${u.id}" style="display:grid;gap:10px">
-        <label>Yangi PIN (6-12 raqam)<input id="ps_pin" required inputmode="numeric" pattern="\\d{6,12}"></label>
+      modal(`<h3>${esc(u.name)}: tahrirlash</h3><form id="pinSetF" data-u="${u.id}" style="display:grid;gap:10px">
+        <label>Ism<input id="ps_name" required value="${esc(u.name)}"></label>
+        <label>Login<input id="ps_login" required maxlength="30" autocapitalize="none" value="${esc(u.login || '')}"></label>
+        <label>Yangi PIN (bo'sh qolsa, eskisi qoladi)<input id="ps_pin" inputmode="numeric" pattern="\\d{1,12}" placeholder="istalgan raqam"></label>
         <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div></form>`);
     }
     if (b.hasAttribute('data-close')) closeModal();
