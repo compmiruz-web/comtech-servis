@@ -182,7 +182,9 @@ function reportModal(){
 }
 function genBarcode(){let b;do{b='20'+String(Date.now()).slice(-8)+String(Math.floor(Math.random()*90+10));}while(S.products.some(p=>p.barcode===b));return b;}
 function applySkin(){document.documentElement.dataset.skin=S.skin||'yashil';}
-const priceUzs=p=>Math.ceil(p.sellUsd*S.rate/1000)*1000;
+const priceUzs=p=>p.sellUzs?+p.sellUzs:Math.ceil(p.sellUsd*S.rate/1000)*1000;
+let kCur=(()=>{try{return localStorage.getItem('comtech_kcur')||'usd'}catch{return 'usd'}})();
+const kSym=()=>kCur==='uzs'?"so'm":'$';
 let cart=[]; let tab='sotuv'; let rFilter='aktiv'; let rSearch=''; let oSearch=''; let cSearch='';
 
 function toast(t){const el=document.getElementById('toast');el.textContent=t;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,2600);}
@@ -329,8 +331,9 @@ function vOmbor(){
       <label class="full">Nomi<input id="k_name" required placeholder="Masalan: SSD Samsung 870 EVO 500GB"></label>
       <label>Yo'nalish (etiketka uchun)<select id="k_line"><option value="noutbuk">Noutbuk</option><option value="kompyuter" selected>Kompyuter / qism</option><option value="servis">Servis</option></select></label>
       <label>Soni<input id="k_qty" type="number" min="1" value="1" required></label>
-      <label>Kelish narxi ($)<input id="k_cost" type="number" step="0.01" min="0" ${owner()?'required':'placeholder="Mavjud tovarda bo\'sh qoldiring"'}></label>
-      <label>Sotish narxi ($)<input id="k_sell" type="number" step="0.01" min="0" ${owner()?'required':'placeholder="Mavjud tovarda bo\'sh qoldiring"'}></label>
+      <label>Narx valyutasi<select id="k_cur"><option value="usd" ${kCur==='usd'?'selected':''}>Dollarda ($)</option><option value="uzs" ${kCur==='uzs'?'selected':''}>So'mda</option></select></label>
+      <label><span id="k_costL">Kelish narxi (${kSym()})</span><input id="k_cost" type="number" step="${kCur==='uzs'?'1000':'0.01'}" min="0" ${owner()?'required':'placeholder="Mavjud tovarda bo\'sh qoldiring"'}></label>
+      <label><span id="k_sellL">Sotish narxi (${kSym()})</span><input id="k_sell" type="number" step="${kCur==='uzs'?'1000':'0.01'}" min="0" ${owner()?'required':'placeholder="Mavjud tovarda bo\'sh qoldiring"'}><span class="small muted" id="k_conv"></span></label>
       <div class="full row"><button class="pri">Omborga qo'shish</button><span class="small muted" id="k_hint">${owner()?"Bor shtrix-kod kiritilsa, soni qo'shiladi va narx yangilanadi.":"Bor tovar skanerlansa, faqat soni qo'shiladi; narxni bo'sh qoldirsangiz eski narx qoladi. Yangi tovarga ikkala narx shart."}</span></div>
     </form></section>`:''}
   <section class="panel">
@@ -340,7 +343,7 @@ function vOmbor(){
     <div class="tbl"><table><thead><tr><th>Nomi</th><th>Shtrix-kod</th><th class="r">Soni</th>${owner()?'<th class="r">Kelish $</th><th class="r">Sotish $</th>':''}<th class="r">Narxi (so'm)</th><th></th></tr></thead><tbody>
     ${list.map(p=>`<tr><td>${esc(p.name)}<div><span class="chip" style="font-size:11px;padding:1px 8px;margin-top:3px">${LINE_SHORT[p.line]||'Kompyuter'}</span></div></td><td class="num small">${esc(p.barcode)}</td>
     <td class="r">${p.qty<=2?`<span class="chip ${p.qty?'warn':'bad'} num">${p.qty}</span>`:`<span class="num">${p.qty}</span>`}</td>
-    ${owner()?`<td class="r num">${usd(p.costUsd)}</td><td class="r num">${usd(p.sellUsd)}</td>`:''}
+    ${owner()?`<td class="r num">${usd(p.costUsd)}</td><td class="r num">${p.sellUzs?`<span title="So'mda qat'iy narx — kurs o'zgarsa ham o'zgarmaydi">${fmt(p.sellUzs)} so'm</span>`:usd(p.sellUsd)}</td>`:''}
     <td class="r num">${fmt(priceUzs(p))}</td><td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-label="${p.id}">Etiketka</button><button class="sm" data-stk="p${p.id}">Yopishtirgich</button></div></td></tr>`).join('')}
     </tbody></table></div>
     ${owner()?'':`<div class="lock" style="margin-top:12px">${canStock()?'Kelish narxlari faqat rahbarga ko\'rinadi.':'Kelish narxi va kirim faqat rahbar rejimida ko\'rinadi.'}</div>`}
@@ -809,6 +812,19 @@ function sysNotify(n){
     navigator.serviceWorker?.getRegistration().then(r=>r?r.showNotification(n.title,o):new Notification(n.title,o)).catch(()=>{try{new Notification(n.title,o)}catch{}});
   }catch{}
 }
+function kConv(){
+  const el=document.getElementById('k_conv'), sv=document.getElementById('k_sell')?.value; if(!el) return;
+  if(sv===''||sv==null){el.textContent='';return;}
+  el.textContent=kCur==='uzs'?`≈ $${(+sv/S.rate).toFixed(2)} · narx so'mda qat'iy qoladi`:`≈ ${fmt(Math.ceil(+sv*S.rate/1000)*1000)} so'm (kurs bo'yicha)`;
+}
+function setKCur(c){
+  const prev=kCur; kCur=c; try{localStorage.setItem('comtech_kcur',c)}catch{}
+  const sel=document.getElementById('k_cur'); if(sel) sel.value=c;
+  for(const id of ['k_cost','k_sell']){const i=document.getElementById(id); if(!i) continue; i.step=c==='uzs'?'1000':'0.01';
+    if(i.value!==''&&prev!==c) i.value=c==='uzs'?Math.round(+i.value*S.rate/1000)*1000:(+i.value/S.rate).toFixed(2);}
+  const a=document.getElementById('k_costL'),b=document.getElementById('k_sellL'); if(a) a.textContent=`Kelish narxi (${kSym()})`; if(b) b.textContent=`Sotish narxi (${kSym()})`;
+  kConv();
+}
 /* ---------- kamera orqali shtrix-kod skanerlash ---------- */
 let camStop=null;
 async function camScan(onCode){
@@ -958,7 +974,7 @@ async function refresh() {
       canExpense: p.can_expense, seeSalary: p.see_salary, canDebt: p.can_debt, canReturn: p.can_return, canCredit: p.can_credit, canStock: p.can_stock,
       oklad: +(payMap[p.id]?.oklad || 0), kpi: +(payMap[p.id]?.kpi || 0), kpiBase: payMap[p.id]?.kpi_base || 'foyda',
     })),
-    products: prods.map((p) => ({ id: p.id, name: p.name, barcode: p.barcode, line: p.line, qty: p.qty, sellUsd: +p.sell_usd, costUsd: costMap[p.id] ?? 0 })),
+    products: prods.map((p) => ({ id: p.id, name: p.name, barcode: p.barcode, line: p.line, qty: p.qty, sellUsd: +p.sell_usd, sellUzs: p.sell_uzs == null ? null : +p.sell_uzs, costUsd: costMap[p.id] ?? 0 })),
     clients: cls.map((c) => ({ phone: c.phone, name: c.name, tg: !!c.tg_chat_id })),
     repairs: reps.map((r) => ({
       talon: r.talon, ts: ms(r.created_at), phone: r.client_phone, name: r.client_name, device: r.device, model: r.model || '',
@@ -1098,7 +1114,7 @@ document.addEventListener('submit', async (e) => {
     }
     if (id === 'kirimF') {
       const q = +v('k_qty'), name = v('k_name');
-      await act(() => db.rpc('stock_in', { p_barcode: v('k_bar'), p_name: name, p_line: v('k_line'), p_qty: q, p_cost: v('k_cost') === '' ? null : +v('k_cost'), p_sell: v('k_sell') === '' ? null : +v('k_sell') }).then(must0), `${name}: +${q} dona`);
+      await act(() => db.rpc('stock_in', { p_barcode: v('k_bar'), p_name: name, p_line: v('k_line'), p_qty: q, p_cost: v('k_cost') === '' ? null : (kCur === 'uzs' ? Math.round(+v('k_cost') / S.rate * 100) / 100 : +v('k_cost')), p_sell: v('k_sell') === '' || kCur === 'uzs' ? null : +v('k_sell'), p_sell_uzs: v('k_sell') !== '' && kCur === 'uzs' ? +v('k_sell') : null }).then(must0), `${name}: +${q} dona`);
     }
     if (id === 'qabulF') {
       const r = await act(() => must(db.rpc('intake_repair', { p: {
@@ -1220,9 +1236,10 @@ document.addEventListener('input', (e) => {
   if (t.id === 'ns_note') nas.note = t.value;
   if (t.id === 'od_phone') { const c = S.clients.find((c) => c.phone === t.value.replace(/\s/g, '')); if (c) document.getElementById('od_name').value = c.name; }
   if (t.id === 'r_phone') { const c = S.clients.find((c) => c.phone === t.value.replace(/\s/g, '')); if (c) document.getElementById('r_name').value = c.name; }
+  if (t.id === 'k_sell') kConv();
   if (t.id === 'k_bar') {
     const p = S.products.find((p) => p.barcode === t.value.trim());
-    if (p) { k_name.value = p.name; k_line.value = p.line || 'kompyuter'; if (owner()) { k_cost.value = p.costUsd; k_sell.value = p.sellUsd; } k_hint.textContent = `Mavjud tovar: omborda ${p.qty} dona`; }
+    if (p) { k_name.value = p.name; k_line.value = p.line || 'kompyuter'; if (owner()) { if (p.sellUzs && kCur !== 'uzs') setKCur('uzs'); k_cost.value = kCur === 'uzs' ? Math.round(p.costUsd * S.rate / 1000) * 1000 : p.costUsd; k_sell.value = kCur === 'uzs' ? priceUzs(p) : p.sellUsd; kConv(); } k_hint.textContent = `Mavjud tovar: omborda ${p.qty} dona`; }
   }
 });
 
@@ -1242,6 +1259,7 @@ document.addEventListener('change', async (e) => {
     if (t.id === 'dFilter') { dFilter = t.value; render(); }
     if (t.id === 'nFilter') { nFilter = t.value; render(); }
     if (t.id === 'salMon') { salMon = t.value; keepScroll(render); }
+    if (t.id === 'k_cur') setKCur(t.value);
     if (t.id === 'pay') { payMode = t.value; render(); }
     if (t.id === 'ns_phone' || t.id === 'ns_pre') keepScroll(render);
     if (t.id === 'saleDate') { saleDate = t.value && t.value <= today() ? t.value : today(); render(); }
