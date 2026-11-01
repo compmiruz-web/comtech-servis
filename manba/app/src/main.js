@@ -25,6 +25,7 @@ const ICONS={
  mijozlar:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 17c.8-1.7 2-2.5 3.5-2.5s2.7.8 3.5 2.5M15 9h3M15 13h3"/>',
  rasxod:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 14.5h2"/><path d="M6 6l9-3 1 3"/>',
  qarz:'<path d="M4 4h12l4 4v12H4z"/><path d="M8 11h8M8 15h5M15 4v4h4"/>',
+ bildirish:'<path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
  hisobot:'<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>',
  sozlamalar:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-2.7-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 2.7-1.1V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>'};
 const ROLES={owner:'Rahbar',usta:'Usta',sotuvchi:'Sotuvchi'};
@@ -199,12 +200,16 @@ function header(){
   if(!cc){cc=document.createElement('button');cc.id='credChip';cc.type='button';cc.className='chip bad';chip.parentNode.insertBefore(cc,chip);}
   const od=canCredit()?S.cdebts.filter(d=>!d.closed&&d.due&&d.due<today()):[];
   cc.hidden=!od.length; cc.innerHTML=`⚠ ${od.length} ta nasiya muddati o'tgan`;
+  let bc=document.getElementById('bellChip');
+  if(!bc){bc=document.createElement('button');bc.id='bellChip';bc.type='button';bc.className='chip';bc.title='Bildirishnomalar';chip.parentNode.insertBefore(bc,chip);}
+  const unread=owner()?S.notifs.filter(n=>!n.read).length:0;
+  bc.hidden=!owner(); bc.innerHTML=`🔔${unread?` <b style="background:#e5484d;color:#fff;border-radius:9px;padding:0 6px;font-size:12px">${unread}</b>`:''}`;
   document.getElementById('roleBtn').innerHTML=`<span class="ava">${esc(me().name.trim()[0]||'?').toUpperCase()}</span><span><span class="who">${esc(me().name)}</span> <span class="muted small">· ${ROLES[me().role]}</span></span>`;
   const tabs=[['mening','Mening blokim'],['sotuv','Sotuv'],['ombor','Ombor'],['ustaxona','Ustaxona'],['mijozlar','Mijozlar']];
   if(canExp()) tabs.push(['rasxod','Rasxodlar']);
   if(canCredit()) tabs.splice(tabs.findIndex(t=>t[0]==='mijozlar')+1,0,['nasiya','Nasiya']);
   if(canDebt()) tabs.push(['qarz','Qarzlar']);
-  if(owner()) {tabs[0]=['xodimlar','Xodimlar']; tabs.push(['hisobot','Hisobot']);}
+  if(owner()) {tabs[0]=['xodimlar','Xodimlar']; tabs.push(['hisobot','Hisobot']); const nu=S.notifs.filter(n=>!n.read).length; tabs.push(['bildirish',nu?`Bildirishnoma (${nu})`:'Bildirishnoma']);}
   tabs.push(['sozlamalar','Sozlamalar']);
   if(!tabs.some(t=>t[0]===tab)) tab=tabs[0][0];
   document.getElementById('tabs').innerHTML=tabs.map(([k,n])=>`<a href="#${k}" class="${k===tab?'on':''}" ${k===tab?'aria-current="page"':''}><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]||''}</svg><span>${n}</span></a>`).join('');
@@ -558,8 +563,9 @@ function vXodimlar(){
   ${S.users.filter(u=>u.role!=='owner'&&u.active).map(u=>{const p=payroll(u);
     return `<tr><td>${esc(u.name)}<div class="small muted">${u.kpi}% ${kpiLabel(u)}</div></td><td class="r num">${fmt(u.oklad)}</td><td class="r num">${fmt(p.kpiSum)}</td>
     <td class="r num">${fmt(p.total)}</td><td class="r num">${fmt(p.paid)}</td><td class="r num"><b>${fmt(p.left)}</b></td>
-    <td><button class="sm" data-pay="${u.id}">Sozlash / to'lash</button></td></tr>`}).join('')}
-  </tbody></table></div><p class="small muted">To'langan oylik avtomatik "Oylik / avans" rasxodi bo'lib yoziladi.</p></section>`:''}
+    <td><div class="row" style="flex-wrap:nowrap"><button class="sm pri" data-salpay="${u.id}">Oylik berish</button><button class="sm" data-pay="${u.id}">Sozlash</button></div></td></tr>`}).join('')}
+  </tbody></table></div><p class="small muted">Berilgan oylik avtomatik "Oylik / avans" rasxodi bo'lib yoziladi va sizga bildirishnoma keladi.</p></section>
+  ${salaryHistory()}`:''}
   <section class="panel"><h2>Yangi xodim qo'shish</h2><form id="userF" class="form">
     <label>Ism<input id="u_name" required></label>
     <label>Lavozim<select id="u_role"><option value="usta">Usta</option><option value="sotuvchi">Sotuvchi</option></select></label>
@@ -741,7 +747,67 @@ function salaryCard(u){
     <div class="stat"><div class="k">Oklad</div><div class="v">${fmt(u.oklad)}</div></div>
     <div class="stat"><div class="k">KPI ${u.kpi}% · ${kpiLabel(u)}</div><div class="v">${fmt(p.kpiSum)}</div></div>
     <div class="stat"><div class="k">Berilgan (avans)</div><div class="v">${fmt(p.paid)}</div></div>
-    <div class="stat"><div class="k">Qoldiq</div><div class="v pos">${fmt(p.left)}</div></div></div></section>`;
+    <div class="stat"><div class="k">Qoldiq</div><div class="v pos">${fmt(p.left)}</div></div></div></section>${salaryHistory(u.id)}`;
+}
+let salMon='';
+function salaryHistory(uid){
+  const mons=[...new Set(S.salPays.map(x=>dayOf(x.ts).slice(0,7)))].sort().reverse();
+  if(!mons.includes(today().slice(0,7))) mons.unshift(today().slice(0,7));
+  const m=salMon&&mons.includes(salMon)?salMon:mons[0];
+  const list=S.salPays.filter(x=>(!uid||x.toUser===uid)&&dayOf(x.ts).startsWith(m));
+  const tot=list.reduce((a,x)=>a+x.amountUzs,0);
+  return `<section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">${uid&&!owner()?'Menga berilgan oyliklar':'Oylik berish tarixi'}</h2>
+    <div class="row"><select id="salMon" style="width:auto">${mons.map(x=>`<option value="${x}" ${x===m?'selected':''}>${x}</option>`).join('')}</select><span class="chip">Jami: <span class="num">${fmt(tot)}</span> so'm</span></div></div>
+  <div class="tbl"><table><thead><tr><th>Sana va vaqt</th>${uid?'':'<th>Xodim</th>'}<th class="r">Summa</th><th>Turi</th><th>Izoh</th>${owner()?'<th>Kim berdi</th><th></th>':''}</tr></thead><tbody>
+  ${list.map(x=>`<tr><td class="num">${new Date(x.ts).toLocaleDateString('uz')} <span class="muted">${new Date(x.ts).toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'})}</span></td>${uid?'':`<td>${esc(uName(x.toUser))}</td>`}
+    <td class="r num"><b>${fmt(x.amountUzs)}</b></td><td>${x.pay==='karta'?'Karta':'Naqd'}</td><td class="small">${esc(x.note)}</td>
+    ${owner()?`<td class="small muted">${esc(uName(x.userId))}</td><td><button class="sm ghost" data-saldel="${x.id}" title="O'chirish">✕</button></td>`:''}</tr>`).join('')||`<tr><td colspan="7" class="muted">Bu oyda oylik berilmagan</td></tr>`}
+  </tbody></table></div></section>`;
+}
+function salPayModal(id){
+  const u=S.users.find(x=>x.id===id), p=payroll(u);
+  const now=new Date(), pad=n=>String(n).padStart(2,'0');
+  modal(`<h3>${esc(u.name)}ga oylik berish</h3><form id="salF" data-u="${u.id}" style="display:grid;gap:10px">
+  <p class="small muted" style="margin:0">Shu oy hisoblangan: ${fmt(p.total)} · berilgan: ${fmt(p.paid)} · qoldiq: <b>${fmt(p.left)}</b> so'm</p>
+  <label>Summa (so'm)<input id="sp_sum" type="number" min="1" step="1000" required value="${p.left>0?p.left:''}" class="num" style="font-size:20px"></label>
+  <div class="row" style="flex-wrap:nowrap"><label style="flex:1">Sana<input id="sp_date" type="date" required value="${today()}"></label><label style="flex:1">Vaqt<input id="sp_time" type="time" required value="${pad(now.getHours())}:${pad(now.getMinutes())}"></label></div>
+  <label>Turi<select id="sp_note"><option>Oylik</option><option>Avans</option><option>Bonus</option><option>KPI</option></select></label>
+  <label>To'lov<select id="sp_pay"><option value="naqd">Naqd</option><option value="karta">Karta</option></select></label>
+  <label>Izoh<input id="sp_extra" placeholder="ixtiyoriy"></label>
+  <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Berildi</button></div></form>`);
+  setTimeout(()=>document.getElementById('sp_sum')?.select(),0);
+}
+let notifMon=null;
+function vBildirish(){
+  if(!owner()) return `<section class="panel"><div class="lock">Bu bo'lim faqat rahbar uchun.</div></section>`;
+  const m=S.month||{}; const net=+m.net||0;
+  const perm=('Notification' in window)?Notification.permission:'none';
+  const lvl={good:'✅',bad:'🔻',info:'ℹ️'};
+  return `<section class="panel"><h2>Shu oy holati · ${today().slice(0,7)}</h2>
+    <div class="stats">
+      <div class="stat"><div class="k">Savdo foydasi</div><div class="v">${fmt(+m.profit||0)}</div></div>
+      <div class="stat"><div class="k">Remont daromadi</div><div class="v">${fmt(+m.repair_income||0)}</div></div>
+      <div class="stat"><div class="k">Rasxodlar</div><div class="v">${fmt(+m.other_expenses||0)}</div></div>
+      <div class="stat"><div class="k">Oyliklar</div><div class="v">${fmt(+m.salary||0)}</div></div>
+      <div class="stat"><div class="k">Sof natija</div><div class="v ${net>=0?'pos':''}" style="${net<0?'color:#e5484d':''}">${net>=0?'+':'−'}${fmt(Math.abs(net))}</div></div></div>
+    <p style="margin:10px 0 0;font-weight:700;font-size:17px">${net>=0?'✅ Bu oy plyusdasiz':'🔻 Bu oy minusdasiz'}</p>
+    <p class="small muted" style="margin:4px 0 0">Har kuni soat 21:05 da kunlik va oy boshidan natija, oyning oxirgi kuni esa oy yakuni bildirishnomasi keladi. Oylik berilganda ham xabar tushadi.</p>
+    ${perm==='default'?'<div class="row" style="margin-top:10px"><button class="sm pri" id="notifPerm">🔔 Telefon/kompyuterga bildirishnoma chiqsin</button></div>':perm==='denied'?'<p class="small muted">Brauzer bildirishnomalari bloklangan — brauzer sozlamalaridan ruxsat bering.</p>':''}
+  </section>
+  <section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Bildirishnomalar</h2>
+    ${S.notifs.some(n=>!n.read)?'<button class="sm" id="notifAll">Hammasini o\'qildi</button>':''}</div>
+  ${S.notifs.map(n=>`<div style="border:1px solid var(--line,#ddd);border-left:4px solid ${n.level==='good'?'#2bb673':n.level==='bad'?'#e5484d':'#6ea6ee'};border-radius:10px;padding:10px 12px;margin-bottom:8px;${n.read?'opacity:.75':''}">
+    <div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b>${n.read?'':'● '}${esc(n.title)}</b><span class="small muted num" style="white-space:nowrap">${new Date(n.ts).toLocaleDateString('uz')} ${new Date(n.ts).toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'})}</span></div>
+    ${n.body?`<div class="small" style="white-space:pre-line;margin-top:4px">${esc(n.body)}</div>`:''}
+    <div class="row" style="justify-content:flex-end;margin-top:6px">${n.read?'':`<button class="sm" data-nread="${n.id}">O'qildi</button>`}<button class="sm ghost" data-ndel="${n.id}">✕</button></div></div>`).join('')||'<p class="muted">Hozircha bildirishnoma yo\'q. Birinchisi bugun 21:05 da keladi.</p>'}
+  </section>`;
+}
+function sysNotify(n){
+  try{
+    if(!('Notification' in window)||Notification.permission!=='granted') return;
+    const o={body:n.body||'',icon:'./icon-192.png',badge:'./icon-192.png',tag:'cm-'+n.id};
+    navigator.serviceWorker?.getRegistration().then(r=>r?r.showNotification(n.title,o):new Notification(n.title,o)).catch(()=>{try{new Notification(n.title,o)}catch{}});
+  }catch{}
 }
 function payModal(id){
   const u=S.users.find(x=>x.id===id), p=payroll(u);
@@ -757,7 +823,7 @@ function payModal(id){
 function modal(html){document.getElementById('modalRoot').innerHTML=`<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;}
 function closeModal(){document.getElementById('modalRoot').innerHTML='';}
 /* ---------- render & events ---------- */
-const views={nasiya:vNasiya,qarz:vQarz,rasxod:vRasxod,mening:vMening,xodimlar:vXodimlar,sotuv:vSotuv,ombor:vOmbor,ustaxona:vUstaxona,mijozlar:vMijozlar,hisobot:vHisobot,sozlamalar:vSozlamalar};
+const views={nasiya:vNasiya,qarz:vQarz,rasxod:vRasxod,mening:vMening,xodimlar:vXodimlar,sotuv:vSotuv,ombor:vOmbor,ustaxona:vUstaxona,mijozlar:vMijozlar,hisobot:vHisobot,sozlamalar:vSozlamalar,bildirish:vBildirish};
 function render(){
   header();
   document.getElementById('main').innerHTML=views[tab]();
@@ -837,6 +903,17 @@ async function refresh() {
   const cpays = cdIds.length ? await must(db.from('customer_payments').select('*').in('debt_id', cdIds).order('created_at')) : [];
   const debtIds = debts.map((d) => d.id);
   const dpays = debtIds.length ? await must(db.from('debt_payments').select('*').in('debt_id', debtIds).order('created_at')) : [];
+  const isOwn = profs.some((p) => p.id === uid && p.role === 'owner');
+  const [salPays, notifs, monthR] = await Promise.all([
+    must(db.from('expenses').select('*').eq('cat', 'oylik').order('created_at', { ascending: false }).limit(1000)),
+    isOwn ? must(db.from('notifications').select('*').order('created_at', { ascending: false }).limit(150)) : Promise.resolve([]),
+    isOwn ? db.rpc('month_summary', { p_month: today().slice(0, 7) }) : Promise.resolve({ data: null }),
+  ]);
+  if (S?.notifs && isOwn) {
+    const known = new Set(S.notifs.map((n) => n.id + ':' + n.ts));
+    const fresh = notifs.filter((n) => !n.read && !known.has(n.id + ':' + ms(n.created_at)));
+    for (const n of fresh.slice(0, 3)) { sysNotify({ id: n.id, title: n.title, body: n.body }); toast('🔔 ' + n.title); }
+  }
   const payMap = Object.fromEntries(pays.map((p) => [p.user_id, p]));
   const costMap = Object.fromEntries(costs.map((c) => [c.product_id, +c.cost_usd]));
   S = {
@@ -868,6 +945,9 @@ async function refresh() {
     cdebts: cdebts.map((d) => ({ id: d.id, ts: ms(d.created_at), saleId: d.sale_id, phone: d.client_phone, name: d.client_name, amount: +d.amount_uzs, paid: +d.paid_uzs,
       due: d.due_date, note: d.note || '', userId: d.user_id, closed: d.closed })),
     cpays: cpays.map((p) => ({ id: p.id, debtId: p.debt_id, ts: ms(p.created_at), amount: +p.amount_uzs, pay: p.pay, note: p.note || '' })),
+    salPays: salPays.map((e) => ({ id: e.id, ts: ms(e.created_at), userId: e.user_id, toUser: e.to_user, amountUzs: +e.amount_uzs, note: e.note || '', pay: e.pay || 'naqd' })),
+    notifs: notifs.map((n) => ({ id: n.id, ts: ms(n.created_at), kind: n.kind, level: n.level, title: n.title, body: n.body || '', read: n.read })),
+    month: monthR?.data || null,
     debtPays: dpays.map((x) => ({ id: x.id, debtId: x.debt_id, ts: ms(x.created_at), amount: +x.amount, note: x.note || '' })),
   };
   applySkin();
@@ -1005,11 +1085,20 @@ document.addEventListener('submit', async (e) => {
       if (v('e_cat') === 'oylik' && !to) return toast('Oylik uchun xodimni tanlang');
       await act(() => must(db.from('expenses').insert({ user_id: S.cur, cat: v('e_cat'), amount_uzs: +v('e_sum'), note: v('e_note'), to_user: to || null })), 'Rasxod saqlandi');
     }
+    if (id === 'salF') {
+      const uidv = e.target.dataset.u, sum = +v('sp_sum') || 0;
+      if (sum <= 0) return toast('Summani kiriting');
+      const at = new Date(`${v('sp_date')}T${v('sp_time') || '12:00'}`);
+      const note = [v('sp_note'), v('sp_extra')].filter(Boolean).join(' · ');
+      await act(() => must(db.from('expenses').insert({ user_id: S.cur, cat: 'oylik', amount_uzs: sum, to_user: uidv, note, pay: v('sp_pay'), created_at: at.toISOString() })),
+        `${uName(uidv)}: ${fmt(sum)} so'm berildi`);
+      closeModal();
+    }
     if (id === 'payF') {
       const uidv = e.target.dataset.u, pay = +v('p_pay') || 0;
       await act(async () => {
         await must(db.from('staff_pay').upsert({ user_id: uidv, oklad: +v('p_oklad') || 0, kpi: +v('p_kpi') || 0, kpi_base: v('p_base') || 'foyda' }));
-        if (pay > 0) await must(db.from('expenses').insert({ user_id: S.cur, cat: 'oylik', amount_uzs: pay, to_user: uidv, note: 'Oylik to\'lovi' }));
+        if (pay > 0) await must(db.from('expenses').insert({ user_id: S.cur, cat: 'oylik', amount_uzs: pay, to_user: uidv, note: 'Oylik', pay: 'naqd' }));
       }, pay > 0 ? `${fmt(pay)} so'm to'landi` : 'Saqlandi');
       closeModal();
     }
@@ -1111,6 +1200,7 @@ document.addEventListener('change', async (e) => {
     if (t.id === 'eMonth') { eMonth = t.value; render(); }
     if (t.id === 'dFilter') { dFilter = t.value; render(); }
     if (t.id === 'nFilter') { nFilter = t.value; render(); }
+    if (t.id === 'salMon') { salMon = t.value; keepScroll(render); }
     if (t.id === 'pay') { payMode = t.value; render(); }
     if (t.id === 'ns_phone' || t.id === 'ns_pre') keepScroll(render);
     if (t.id === 'saleDate') { saleDate = t.value && t.value <= today() ? t.value : today(); render(); }
@@ -1156,6 +1246,18 @@ document.addEventListener('click', async (e) => {
     }
     if (b.id === 'logoutBtn') { await db.auth.signOut(); closeModal(); cart = []; location.hash = ''; showLogin(); }
     if (b.dataset.pay) payModal(b.dataset.pay);
+    if (b.dataset.salpay) salPayModal(b.dataset.salpay);
+    if (b.dataset.saldel) {
+      const x = S.salPays.find((y) => String(y.id) === b.dataset.saldel);
+      modal(`<h3>Oylik yozuvini o'chirish</h3><p>${esc(uName(x?.toUser))}: ${fmt(x?.amountUzs || 0)} so'm, ${x ? new Date(x.ts).toLocaleString('uz') : ''}. O'chirilsinmi?</p>
+        <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yo'q</button><button class="pri" data-saldelyes="${b.dataset.saldel}">Ha, o'chirish</button></div>`);
+    }
+    if (b.dataset.saldelyes) { await act(() => must(db.from('expenses').delete().eq('id', b.dataset.saldelyes)), "O'chirildi"); closeModal(); }
+    if (b.id === 'bellChip') location.hash = 'bildirish';
+    if (b.id === 'notifPerm' && 'Notification' in window) { const r = await Notification.requestPermission(); toast(r === 'granted' ? 'Bildirishnomalar yoqildi' : 'Ruxsat berilmadi'); render(); }
+    if (b.id === 'notifAll') await act(() => must(db.from('notifications').update({ read: true }).eq('read', false)), 'Hammasi o\'qildi');
+    if (b.dataset.nread) await act(() => must(db.from('notifications').update({ read: true }).eq('id', b.dataset.nread)));
+    if (b.dataset.ndel) await act(() => must(db.from('notifications').delete().eq('id', b.dataset.ndel)));
     if (b.dataset.label) labelModal(b.dataset.label);
     if (b.id === 'repPrev') reportModal();
     if (b.dataset.stk) {
