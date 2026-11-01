@@ -4,6 +4,13 @@ import qrcode from 'qrcode-generator';
 
 const today=()=>new Date().toLocaleDateString('en-CA');
 const dayOf=ts=>new Date(ts).toLocaleDateString('en-CA');
+// Vaqt: Toshkent vaqti bo'yicha soat:minut:soniya
+const _tz={timeZone:'Asia/Tashkent'};
+const _p2=n=>String(n).padStart(2,'0');
+function _parts(ts){const f=new Intl.DateTimeFormat('en-GB',{..._tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(new Date(ts));const o={};f.forEach(x=>o[x.type]=x.value);if(o.hour==='24')o.hour='00';return o;}
+const tS=ts=>{if(!ts)return '';const o=_parts(ts);return `${o.hour}:${o.minute}:${o.second}`;};
+const dS=ts=>{if(!ts)return '';const o=_parts(ts);return `${o.day}.${o.month}.${o.year}`;};
+const dts=ts=>ts?`${dS(ts)} ${tS(ts)}`:'';
 const fmt=n=>String(Math.round(n||0)).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
 const usd=n=>'$'+(Math.round((n||0)*100)/100).toFixed(2);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -93,7 +100,7 @@ const PAYN={naqd:'Naqd',karta:'Karta',otkazma:"O'tkazma",nasiya:'Nasiya'};
 function receiptModal(sale){const c=S.company; const bl=sale.items[0]?.line||'kompyuter', bn=brandOf(bl);
   modal(`<h3>Sotuv cheki</h3><div class="ticket" ${tkAttr()}>
   <div class="hd"><b>${esc(bn)}</b><br>${bn!==c.name?esc(c.name)+' · ':''}${esc(c.sub)}</div><hr>
-  <div class="kv"><span>Sana:</span><span>${new Date(sale.ts).toLocaleString('uz',{dateStyle:'short',timeStyle:'short'})}</span></div>
+  <div class="kv"><span>Sana:</span><span>${dts(sale.ts)}</span></div>
   <div class="kv"><span>Chek №:</span><span>${sale.no||''}</span></div>
   <div class="kv"><b>Chek berdi:</b><b>${esc(uName(sale.userId))}</b></div><hr>
   ${sale.items.map(i=>`<div>${esc(i.name)}</div><div class="kv"><span>${i.qty} × ${fmt(i.priceUzs)}</span><span>${fmt(i.qty*i.priceUzs)}</span></div>`).join('')}<hr>
@@ -217,6 +224,9 @@ function header(){
   document.getElementById('tabs').innerHTML=tabs.map(([k,n])=>`<a href="#${k}" class="${k===tab?'on':''}" ${k===tab?'aria-current="page"':''}><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]||''}</svg><span>${n}</span></a>`).join('');
   const cur=tabs.find(t=>t[0]===tab); document.getElementById('pageTitle').textContent=cur?cur[1]:'';
   document.getElementById('pageDate').textContent=new Date().toLocaleDateString('uz-UZ',{weekday:'long',day:'numeric',month:'long'});
+  let ck=document.getElementById('clockChip');
+  if(!ck){ck=document.createElement('span');ck.id='clockChip';ck.className='chip num';ck.style.cssText='font-variant-numeric:tabular-nums;font-weight:700;letter-spacing:.5px';ck.title='Hozirgi vaqt (Toshkent)';chip.parentNode.insertBefore(ck,chip.parentNode.firstChild);
+    const tick=()=>{ck.textContent='🕒 '+tS(Date.now());}; tick(); setInterval(tick,1000);}
 }
 
 /* ---------- SOTUV ---------- */
@@ -285,7 +295,7 @@ function salesHistory(){
     <div class="row small" style="margin-bottom:10px;gap:14px"><span>Sotuv: <b class="num">${fmt(rev)}</b></span>${back?`<span>Vazvrat: <b class="num" style="color:var(--bad)">−${fmt(back)}</b></span><span>Sof: <b class="num">${fmt(rev-back)}</b></span>`:''}</div>
     ${salesTable(list)}
     ${rets.length?`<h2 style="margin:18px 0 10px">Vazvratlar</h2><div class="tbl"><table><thead><tr><th>Tovar</th><th class="r">Soni</th><th class="r">Qaytarilgan pul</th><th>Sabab</th><th>Kim</th></tr></thead><tbody>
-      ${rets.map(r=>`<tr><td>${esc(r.name)}<div class="small muted">sotuv №${r.saleNo||''}</div></td><td class="r num">${r.qty}</td><td class="r num">−${fmt(r.refund)}</td><td>${esc(r.reason)}</td><td>${esc(uName(r.userId))}</td></tr>`).join('')}
+      ${rets.map(r=>`<tr><td>${esc(r.name)}<div class="small muted">sotuv №${r.saleNo||''} · <span class="num">${dts(r.ts)}</span></div></td><td class="r num">${r.qty}</td><td class="r num">−${fmt(r.refund)}</td><td>${esc(r.reason)}</td><td>${esc(uName(r.userId))}</td></tr>`).join('')}
       </tbody></table></div>`:''}</section>`;
 }
 function returnModal(saleId){
@@ -305,7 +315,7 @@ function salesTable(list){
   if(!list.length) return '<p class="muted">Hali sotuv yo\'q.</p>';
   return `<div class="tbl"><table><thead><tr><th>№ / vaqt</th><th>Tovarlar</th><th>Sotuvchi</th><th>To'lov</th><th class="r">Summa</th>${owner()?'<th class="r">Foyda</th>':''}<th></th></tr></thead><tbody>
   ${list.slice().reverse().map(s=>{const late=s.enteredTs&&dayOf(s.enteredTs)!==dayOf(s.ts);
-    return `<tr><td class="num">${s.no?'№'+s.no:''}<div class="small muted">${late?'keyin kiritilgan':new Date(s.ts).toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'})}</div></td>
+    return `<tr><td class="num">${s.no?'№'+s.no:''}<div class="small muted num">${late?`${dS(s.ts)} · kiritildi ${dts(s.enteredTs)}`:tS(s.ts)}</div></td>
   <td>${s.items.map(i=>{const b=returnedQty(i.id);return esc(i.name)+' ×'+i.qty+(b?` <span class="chip bad" style="font-size:11px;padding:1px 7px">${b} qaytgan</span>`:'');}).join('<br>')}</td><td>${esc(uName(s.userId))}</td><td>${esc(s.pay)}</td><td class="r num">${fmt(s.totalUzs)}</td>
   ${owner()?`<td class="r num">${fmt(saleProfit(s))}</td>`:''}
   <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-receipt="${s.id}">Chek</button>${canReturn()?`<button class="sm" data-return="${s.id}">Vazvrat</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`;
@@ -377,7 +387,7 @@ function vUstaxona(){
       <input id="rSearch" placeholder="Talon №, telefon, ism…" value="${esc(rSearch)}" style="flex:1;min-width:160px">
     </div>
     <div class="tbl"><table><thead><tr><th>Talon</th><th>Mijoz</th><th>Qurilma / muammo</th><th>Holati</th><th class="r">Narx</th><th></th></tr></thead><tbody>
-    ${list.map(r=>`<tr><td class="talonno">№${r.talon}<div class="small muted">${new Date(r.ts).toLocaleDateString('uz')}</div></td>
+    ${list.map(r=>`<tr><td class="talonno">№${r.talon}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div></td>
       <td>${esc(r.name)}<div class="small muted num">${esc(r.phone)}</div></td>
       <td>${esc(r.device)}${r.model?' · '+esc(r.model):''}<div class="small muted">${esc(r.problem)}</div><div class="small muted">Usta: ${esc(uName(r.masterId))}</div></td>
       <td><select data-st="${r.talon}" style="width:auto;padding:4px 8px" aria-label="Holati">${STATUSES.map(s=>`<option value="${s[0]}" ${s[0]===r.status?'selected':''}>${s[1]}</option>`).join('')}</select>
@@ -392,7 +402,7 @@ function ticketHtml(r){
   return `<div class="ticket" ${tkAttr()}>
   <div class="hd"><b>${esc(brandOf('servis'))}</b><br>${esc(S.company.sub)}</div><hr>
   <div class="tn"><span>TALON</span><span class="bigno">№${r.talon}</span></div>
-  <div class="kv"><span>${new Date(r.ts).toLocaleDateString('uz')}</span><span>${new Date(r.ts).toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'})}</span></div>
+  <div class="kv"><span>${dS(r.ts)}</span><span>${tS(r.ts)}</span></div>
   ${code128Svg('T'+r.talon,30)}<hr>
   <div class="f"><span>Mijoz</span><span>${esc(r.name)}</span><span>Tel</span><span>${esc(r.phone)}</span>
   <span>Qurilma</span><span>${esc(r.device)} ${esc(r.model||'')}</span>${r.serial?`<span>S/N</span><span>${esc(r.serial)}</span>`:''}
@@ -517,7 +527,7 @@ function userBlock(u){
       <div class="stat"><div class="k">Shu oy topshirildi</div><div class="v">${doneMon.length}</div></div>
       <div class="stat"><div class="k">Shu oy ish summasi</div><div class="v">${fmt(doneMon.reduce((a,r)=>a+(+r.feeUzs||0),0))}</div></div></div></section>
     <section class="panel"><h2>Ishdagi qurilmalar</h2><div class="tbl"><table><thead><tr><th>Talon</th><th>Qurilma / muammo</th><th>Mijoz</th><th>Holati</th><th></th></tr></thead><tbody>
-    ${act.map(r=>`<tr><td class="talonno">№${r.talon}<div class="small muted">${new Date(r.ts).toLocaleDateString('uz')}</div></td>
+    ${act.map(r=>`<tr><td class="talonno">№${r.talon}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div></td>
       <td>${esc(r.device)}${r.model?' · '+esc(r.model):''}<div class="small muted">${esc(r.problem)}</div></td>
       <td>${esc(r.name)}<div class="small muted num">${esc(r.phone)}</div></td>
       <td><select data-st="${r.talon}" style="width:auto;padding:4px 8px" aria-label="Holati">${STATUSES.map(s=>`<option value="${s[0]}" ${s[0]===r.status?'selected':''}>${s[1]}</option>`).join('')}</select></td>
@@ -613,7 +623,7 @@ function vNasiya(){
     <input id="nSearch" placeholder="Ism, telefon…" value="${esc(nSearch)}" style="flex:1;min-width:160px"></div>
     <div class="tbl"><table><thead><tr><th>Mijoz</th><th>Nima olgan</th><th class="r">Summa</th><th class="r">To'langan</th><th class="r">Qoldiq</th><th>Muddat</th><th></th></tr></thead><tbody>
     ${list.map(d=>`<tr style="${!d.closed&&d.due&&d.due<t?'background:var(--bad-soft)':''}">
-      <td class="who">${esc(d.name)}<div class="small muted num">${esc(d.phone)}</div></td>
+      <td class="who">${esc(d.name)}<div class="small muted num">${esc(d.phone)}</div><div class="small muted num">${dts(d.ts)}</div></td>
       <td class="small">${debtItems(d)}<div class="muted">${dayOf(d.ts)}${d.note?' · '+esc(d.note):''}</div></td>
       <td class="r num">${fmt(d.amount)}</td><td class="r num">${fmt(d.paid)}</td>
       <td class="r num"><b>${left(d)<0?'<span style="color:var(--info)">mijozga '+fmt(-left(d))+'</span>':fmt(left(d))}</b></td>
@@ -640,7 +650,7 @@ function cpayModal(id){
   const d=S.cdebts.find(x=>x.id===id), l=d.amount-d.paid, hist=S.cpays.filter(p=>p.debtId===id);
   modal(`<h3>${esc(d.name)}: to'lov qabul qilish</h3>
   <p class="muted" style="margin:0">Qoldiq qarz: <b>${fmt(l)} so'm</b>${d.due?' · muddat '+dmy(d.due):''}</p>
-  ${hist.length?`<div class="small">${hist.map(p=>`<div style="display:flex;justify-content:space-between"><span class="muted">${dayOf(p.ts)} · ${PAYN[p.pay]||p.pay}${p.note?' · '+esc(p.note):''}</span><span class="num">${fmt(p.amount)}</span></div>`).join('')}</div>`:''}
+  ${hist.length?`<div class="small">${hist.map(p=>`<div style="display:flex;justify-content:space-between"><span class="muted">${dts(p.ts)} · ${PAYN[p.pay]||p.pay}${p.note?' · '+esc(p.note):''}</span><span class="num">${fmt(p.amount)}</span></div>`).join('')}</div>`:''}
   <form id="cpayF" data-d="${d.id}" style="display:grid;gap:10px">
     <label>Summa (so'm)<input id="cp_sum" type="number" min="1" step="1000" max="${l}" value="${l}" required class="num" style="font-size:20px"></label>
     <label>To'lov turi<select id="cp_pay"><option value="naqd">Naqd</option><option value="karta">Karta</option><option value="otkazma">O'tkazma</option></select></label>
@@ -650,7 +660,7 @@ function cpayModal(id){
 function cpayReceipt(d, amount, pay){const c=S.company, left=d.amount-d.paid;
   modal(`<h3>To'lov cheki</h3><div class="ticket" ${tkAttr()}>
   <div class="hd"><b>${esc(c.name)}</b><br>Nasiya to'lovi</div><hr>
-  <div class="kv"><span>Sana:</span><span>${new Date().toLocaleString('uz',{dateStyle:'short',timeStyle:'short'})}</span></div>
+  <div class="kv"><span>Sana:</span><span>${dts(Date.now())}</span></div>
   <div class="kv"><span>Mijoz:</span><span>${esc(d.name)}</span></div><div class="kv"><span>Tel:</span><span>${esc(d.phone)}</span></div><hr>
   <div class="kv" style="font-weight:800"><span>TO'LANDI:</span><span>${fmt(amount)} so'm</span></div><div class="kv"><span>Turi:</span><span>${PAYN[pay]||pay}</span></div>
   <div class="kv"><span>Qolgan qarz:</span><span>${fmt(Math.max(left,0))} so'm</span></div>${left<=0?'<div class="c" style="font-weight:800;margin-top:4px">QARZ TO\'LIQ YOPILDI</div>':''}<hr>
@@ -697,7 +707,7 @@ function vQarz(){
     <input id="dSearch" placeholder="Kimdan, telefon, tovar…" value="${esc(dSearch)}" style="flex:1;min-width:160px"></div>
     <div class="tbl"><table><thead><tr><th>Sana</th><th>Kimdan</th><th>Tovar</th><th class="r">Summa</th><th class="r">To'langan</th><th class="r">Qoldiq</th><th></th></tr></thead><tbody>
     ${list.map(d=>{const left=d.amount-d.paid, late=!d.closed&&d.due&&d.due<today0;
-      return `<tr><td class="num small">${dayOf(d.ts)}${d.due?`<div class="small ${late?'':'muted'}" style="${late?'color:var(--bad)':''}">muddat ${d.due}</div>`:''}</td>
+      return `<tr><td class="num small">${dts(d.ts)}${d.due?`<div class="small ${late?'':'muted'}" style="${late?'color:var(--bad)':''}">muddat ${d.due}</div>`:''}</td>
       <td class="who">${esc(d.supplier)}<div class="small muted num">${esc(d.phone)}</div></td>
       <td>${d.type?`<span class="chip" style="font-size:11px;padding:1px 8px">${esc(d.type)}</span> `:''}${esc(d.name)} <span class="muted">× ${d.qty}</span>${d.note?`<div class="small muted">${esc(d.note)}</div>`:''}${owner()?`<div class="small muted">kiritdi: ${esc(uName(d.userId))}</div>`:''}</td>
       <td class="r num">${money(d.amount,d.cur)}</td><td class="r num">${money(d.paid,d.cur)}</td>
@@ -710,7 +720,7 @@ function payDebtModal(id){
   const hist=S.debtPays.filter(p=>p.debtId===id);
   modal(`<h3>${esc(d.supplier)}: qarzni to'lash</h3>
   <p class="muted" style="margin:0">${esc(d.name)} × ${d.qty} · qoldiq <b>${money(left,d.cur)}</b></p>
-  ${hist.length?`<div class="small">${hist.map(p=>`<div class="kv" style="display:flex;justify-content:space-between"><span class="muted">${dayOf(p.ts)}${p.note?' · '+esc(p.note):''}</span><span class="num">${money(p.amount,d.cur)}</span></div>`).join('')}</div>`:''}
+  ${hist.length?`<div class="small">${hist.map(p=>`<div class="kv" style="display:flex;justify-content:space-between"><span class="muted">${dts(p.ts)}${p.note?' · '+esc(p.note):''}</span><span class="num">${money(p.amount,d.cur)}</span></div>`).join('')}</div>`:''}
   <form id="payDebtF" data-d="${d.id}" style="display:grid;gap:10px">
     <label>To'lov summasi (${d.cur==='usd'?'$':"so'm"})<input id="pd_sum" type="number" min="0.01" step="0.01" max="${left}" value="${left}" required class="num"></label>
     <label>Izoh<input id="pd_note" placeholder="naqd, karta…"></label>
@@ -740,7 +750,7 @@ function vRasxod(){
     <div class="stat"><div class="k">Shu oy jami</div><div class="v">${fmt(sum(list))}</div></div>
     ${byCat.slice(0,2).map(([k,v])=>`<div class="stat"><div class="k">${CATS[k]}</div><div class="v">${fmt(v)}</div></div>`).join('')}</div>
     <div class="tbl" style="margin-top:14px"><table><thead><tr><th>Sana</th><th>Turi</th><th>Izoh</th>${owner()?'<th>Kiritgan</th>':''}<th class="r">Summa</th>${owner()?'<th></th>':''}</tr></thead><tbody>
-    ${list.slice().reverse().map(e=>`<tr><td class="num small">${dayOf(e.ts)}</td><td>${CATS[e.cat]}${e.toUser?`<div class="small muted">→ ${esc(uName(e.toUser))}</div>`:''}</td><td>${esc(e.note)}</td>
+    ${list.slice().reverse().map(e=>`<tr><td class="num small">${dts(e.ts)}</td><td>${CATS[e.cat]}${e.toUser?`<div class="small muted">→ ${esc(uName(e.toUser))}</div>`:''}</td><td>${esc(e.note)}</td>
     ${owner()?`<td>${esc(uName(e.userId))}</td>`:''}<td class="r num">${fmt(e.amountUzs)}</td>${owner()?`<td><button class="sm ghost" data-delexp="${e.id}" aria-label="O'chirish">✕</button></td>`:''}</tr>`).join('')||`<tr><td colspan="6" class="muted">Bu oyda rasxod yo'q</td></tr>`}
     </tbody></table></div></section>`;
 }
@@ -762,7 +772,7 @@ function salaryHistory(uid){
   return `<section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">${uid&&!owner()?'Menga berilgan oyliklar':'Oylik berish tarixi'}</h2>
     <div class="row"><select id="salMon" style="width:auto">${mons.map(x=>`<option value="${x}" ${x===m?'selected':''}>${x}</option>`).join('')}</select><span class="chip">Jami: <span class="num">${fmt(tot)}</span> so'm</span></div></div>
   <div class="tbl"><table><thead><tr><th>Sana va vaqt</th>${uid?'':'<th>Xodim</th>'}<th class="r">Summa</th><th>Turi</th><th>Izoh</th>${owner()?'<th>Kim berdi</th><th></th>':''}</tr></thead><tbody>
-  ${list.map(x=>`<tr><td class="num">${new Date(x.ts).toLocaleDateString('uz')} <span class="muted">${new Date(x.ts).toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'})}</span></td>${uid?'':`<td>${esc(uName(x.toUser))}</td>`}
+  ${list.map(x=>`<tr><td class="num">${dS(x.ts)} <span class="muted">${tS(x.ts)}</span></td>${uid?'':`<td>${esc(uName(x.toUser))}</td>`}
     <td class="r num"><b>${fmt(x.amountUzs)}</b></td><td>${x.pay==='karta'?'Karta':'Naqd'}</td><td class="small">${esc(x.note)}</td>
     ${owner()?`<td class="small muted">${esc(uName(x.userId))}</td><td><button class="sm ghost" data-saldel="${x.id}" title="O'chirish">✕</button></td>`:''}</tr>`).join('')||`<tr><td colspan="7" class="muted">Bu oyda oylik berilmagan</td></tr>`}
   </tbody></table></div></section>`;
@@ -800,7 +810,7 @@ function vBildirish(){
   <section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Bildirishnomalar</h2>
     ${S.notifs.some(n=>!n.read)?'<button class="sm" id="notifAll">Hammasini o\'qildi</button>':''}</div>
   ${S.notifs.map(n=>`<div style="border:1px solid var(--line,#ddd);border-left:4px solid ${n.level==='good'?'#2bb673':n.level==='bad'?'#e5484d':'#6ea6ee'};border-radius:10px;padding:10px 12px;margin-bottom:8px;${n.read?'opacity:.75':''}">
-    <div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b>${n.read?'':'● '}${esc(n.title)}</b><span class="small muted num" style="white-space:nowrap">${new Date(n.ts).toLocaleDateString('uz')} ${new Date(n.ts).toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'})}</span></div>
+    <div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b>${n.read?'':'● '}${esc(n.title)}</b><span class="small muted num" style="white-space:nowrap">${dts(n.ts)}</span></div>
     ${n.body?`<div class="small" style="white-space:pre-line;margin-top:4px">${esc(n.body)}</div>`:''}
     <div class="row" style="justify-content:flex-end;margin-top:6px">${n.read?'':`<button class="sm" data-nread="${n.id}">O'qildi</button>`}<button class="sm ghost" data-ndel="${n.id}">✕</button></div></div>`).join('')||'<p class="muted">Hozircha bildirishnoma yo\'q. Birinchisi bugun 21:05 da keladi.</p>'}
   </section>`;
@@ -1317,7 +1327,7 @@ document.addEventListener('click', async (e) => {
     }
     if (b.dataset.saldel) {
       const x = S.salPays.find((y) => String(y.id) === b.dataset.saldel);
-      modal(`<h3>Oylik yozuvini o'chirish</h3><p>${esc(uName(x?.toUser))}: ${fmt(x?.amountUzs || 0)} so'm, ${x ? new Date(x.ts).toLocaleString('uz') : ''}. O'chirilsinmi?</p>
+      modal(`<h3>Oylik yozuvini o'chirish</h3><p>${esc(uName(x?.toUser))}: ${fmt(x?.amountUzs || 0)} so'm, ${x ? dts(x.ts) : ''}. O'chirilsinmi?</p>
         <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yo'q</button><button class="pri" data-saldelyes="${b.dataset.saldel}">Ha, o'chirish</button></div>`);
     }
     if (b.dataset.saldelyes) { await act(() => must(db.from('expenses').delete().eq('id', b.dataset.saldelyes)), "O'chirildi"); closeModal(); }
