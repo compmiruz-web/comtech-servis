@@ -1243,4 +1243,27 @@ async function boot() {
   await enter();
 }
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => {});
+// Yangi versiya chiqsa o'zi yangilanadi (forma ochiq bo'lmasa), aks holda tugma chiqadi
+(function autoUpdate(){
+  const mine = document.querySelector('script[type=module][src]')?.getAttribute('src');
+  if (!mine || location.protocol !== 'https:') return;
+  let shown = false;
+  async function check(){
+    try {
+      const h = await fetch('./index.html?v=' + Date.now(), { cache: 'no-store' }).then(r => r.text());
+      if (h.includes('<script') && !h.includes(mine)) {
+        const busy = document.querySelector('.modal, dialog[open]') || (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
+        if (!busy) return location.reload();
+        if (shown) return; shown = true;
+        const b = document.createElement('button');
+        b.textContent = '🔄 Yangi versiya — yangilash';
+        b.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9999;padding:12px 18px;border-radius:12px;border:0;background:#2bb673;color:#fff;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.3)';
+        b.onclick = () => location.reload();
+        document.body.appendChild(b);
+      }
+    } catch {}
+  }
+  setInterval(check, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+})();
 boot();
