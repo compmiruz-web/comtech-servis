@@ -496,7 +496,7 @@ function vUstaxona(){
       <td><select data-st="${r.talon}" style="width:auto;padding:4px 8px" aria-label="Holati">${STATUSES.map(s=>`<option value="${s[0]}" ${s[0]===r.status?'selected':''}>${s[1]}</option>`).join('')}</select>
         <div style="margin-top:4px"><span class="status s-${r.status}">${stName(r.status)}</span></div></td>
       <td class="r"><input data-fee="${r.talon}" type="number" step="1000" min="0" value="${r.feeUzs||''}" style="width:110px;text-align:right" class="num" aria-label="Narx"></td>
-      <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-talon="${r.talon}">Talon</button><button class="sm" data-stk="r${r.talon}">Yopishtirgich</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">Topilmadi</td></tr>'}
+      <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-talon="${r.talon}">Talon</button><button class="sm" data-redit="${r.talon}">Tahrirlash</button><button class="sm" data-stk="r${r.talon}">Yopishtirgich</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">Topilmadi</td></tr>'}
     </tbody></table></div>
   </section>`;
 }
@@ -517,7 +517,21 @@ function ticketHtml(r){
 function showTalon(t){
   const r=S.repairs.find(x=>x.talon===t); if(!r) return;
   modal(`<h3>Talon №${tn(r.talon)}</h3>${ticketHtml(r)}
-  <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button>${printBtn('ticket')}</div>`);
+  <div class="row" style="justify-content:flex-end"><button type="button" data-redit="${r.talon}">Tahrirlash</button><button type="button" data-close>Yopish</button>${printBtn('ticket')}</div>`);
+}
+function editRepair(t){
+  const r=S.repairs.find(x=>x.talon===t); if(!r) return;
+  modal(`<h3>Talon №${tn(r.talon)} · tahrirlash</h3><form id="rEditF" class="form" data-t="${r.talon}">
+    <label>Telefon raqami<input id="re_phone" required inputmode="tel" value="${esc(r.phone)}" list="phones2"></label>
+    <datalist id="phones2">${S.clients.map(c=>`<option value="${esc(c.phone)}">${esc(c.name)}</option>`).join('')}</datalist>
+    <label>Mijoz ismi<input id="re_name" required value="${esc(r.name)}"></label>
+    <label>Qurilma<input id="re_dev" required value="${esc(r.device)}"></label>
+    <label>Modeli<input id="re_model" value="${esc(r.model)}"></label>
+    <label>Seriya raqami<input id="re_serial" value="${esc(r.serial)}"></label>
+    <label>Komplekt<input id="re_acc" value="${esc(r.acc)}"></label>
+    <label class="full">Nosozlik sababi<textarea id="re_prob" required>${esc(r.problem)}</textarea></label>
+    <div class="full row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div>
+  </form>`);
 }
 
 /* ---------- MIJOZLAR ---------- */
@@ -1284,6 +1298,16 @@ document.addEventListener('submit', async (e) => {
         problem: v('r_prob'), accessories: v('r_acc'), fee_uzs: +v('r_fee') || 0, master_id: v('r_master') } })), (r) => `Talon №${tn(r.talon)} berildi`);
       showTalon(r.talon);
     }
+    if (id === 'rEditF') {
+      const t = +e.target.dataset.t, phone = v('re_phone').replace(/[\s-]/g, ''), name = v('re_name').trim();
+      await act(async () => {
+        if (phone !== '+998000000000') await must(db.from('clients').upsert({ phone, name }, { onConflict: 'phone' }));
+        else if (!S.clients.some((c) => c.phone === phone)) await must(db.from('clients').insert({ phone, name: 'Telefon yozilmagan' }));
+        await must(db.from('repairs').update({ client_phone: phone, client_name: name, device: v('re_dev'), model: v('re_model') || null,
+          serial: v('re_serial') || null, accessories: v('re_acc') || null, problem: v('re_prob') }).eq('talon', t));
+      }, `Talon №${tn(t)} saqlandi`);
+      closeModal();
+    }
     if (id === 'userF') {
       await act(() => adminUsers({ action: 'create', name: v('u_name'), login: v('u_login'), role: v('u_role'), pin: v('u_pin') }), 'Xodim qo\'shildi');
     }
@@ -1628,6 +1652,7 @@ document.addEventListener('click', async (e) => {
       const sale = S.sales.find((s) => s.id === res.id); if (sale) receiptModal(sale);
     }
     if (b.dataset.talon) showTalon(+b.dataset.talon);
+    if (b.dataset.redit) editRepair(+b.dataset.redit);
     if (b.dataset.print) {
       const w = b.dataset.print;
       if (w === 'ticket') printHtml(document.querySelector('.modal .ticket').outerHTML, +S.printers.receiptW || 80);
