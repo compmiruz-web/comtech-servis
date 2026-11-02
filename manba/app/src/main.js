@@ -42,6 +42,12 @@ const CATS={qism:'Ehtiyot qism',transport:'Transport',ovqat:'Ovqat',kommunal:'Ko
 const canExp=()=>S.mods.expenses&&(owner()||me().canExpense);
 const canReturn=()=>S.mods.returns!==false&&(owner()||me().canReturn);
 const canCredit=()=>S.mods.credit!==false&&(owner()||me().canCredit);
+const canDisc=()=>owner()||(S.mods.discount!==false&&me().canDiscount);
+const discLim=line=>owner()?100:+(S.discount?.[line]||0);
+const minPrice=c=>Math.ceil(c.listUzs*(1-discLim(c.line)/100)/1000)*1000;
+const usdOfUzs=u=>u/S.rate;
+const usdP=p=>p.sellUzs?p.sellUzs/S.rate:p.sellUsd;
+const both=(uzs,usdv)=>`${fmt(uzs)} so'm <span class="muted">· ${usd(usdv==null?uzs/S.rate:usdv)}</span>`;
 const canStock=()=>owner()||(S.mods.stockin!==false&&me().canStock);
 const canDebt=()=>S.mods.debts!==false&&(owner()||me().canDebt);
 const monthOf=ts=>dayOf(ts).slice(0,7);
@@ -124,8 +130,9 @@ function receiptModal(sale){const c=S.company; const bl=sale.items[0]?.line||'ko
   <div class="kv"><span>Sana:</span><span>${dts(sale.ts)}</span></div>
   <div class="kv"><span>Chek №:</span><span>${sale.no||''}</span></div>
   <div class="kv"><b>Chek berdi:</b><b>${esc(uName(sale.userId))}</b></div><hr>
-  ${sale.items.map(i=>`<div>${esc(i.name)}</div><div class="kv"><span>${i.qty} × ${fmt(i.priceUzs)}</span><span>${fmt(i.qty*i.priceUzs)}</span></div>`).join('')}<hr>
+  ${sale.items.map(i=>`<div>${esc(i.name)}</div>${i.listUzs>i.priceUzs?`<div class="kv"><span>Asl narx: ${fmt(i.listUzs)}</span><span>chegirma −${fmt((i.listUzs-i.priceUzs)*i.qty)}</span></div>`:''}<div class="kv"><span>${i.qty} × ${fmt(i.priceUzs)}</span><span>${fmt(i.qty*i.priceUzs)}</span></div>`).join('')}<hr>
   <div class="kv" style="font-size:13px;font-weight:800"><span>JAMI:</span><span>${fmt(sale.totalUzs)} so'm</span></div>
+  <div class="kv"><span>Dollarda:</span><span>≈ ${usd(sale.totalUzs/(sale.rate||S.rate))} (1$=${fmt(sale.rate||S.rate)})</span></div>
   <div class="kv"><span>To'lov:</span><span>${esc(PAYN[sale.pay]||sale.pay)}</span></div><hr>
   ${sale.pay==='nasiya'?(()=>{const d=S.cdebts.find(x=>x.saleId===sale.id); return d?`<div class="kv"><span>Mijoz:</span><span>${esc(d.name)}</span></div><div class="kv"><span>Tel:</span><span>${esc(d.phone)}</span></div>
     <div class="kv"><span>To'landi:</span><span>${fmt(d.paid)}</span></div><div class="kv" style="font-weight:800"><span>QARZ:</span><span>${fmt(d.amount-d.paid)} so'm</span></div>
@@ -266,11 +273,15 @@ function vSotuv(){
   <section class="panel">
     <h2>Savat</h2>
     ${cart.length?`<div class="tbl"><table><thead><tr><th>Tovar</th><th class="r">Soni</th><th class="r">Summa</th><th></th></tr></thead><tbody>
-    ${cart.map((c,i)=>`<tr><td>${esc(c.name)}<div class="small muted num">${fmt(c.priceUzs)} so'm</div></td>
+    ${cart.map((c,i)=>{const lp=c.listUzs||c.priceUzs, dsc=lp-c.priceUzs, pct=lp?dsc/lp*100:0;
+      return `<tr><td>${esc(c.name)}<div class="small num">${both(c.priceUzs)}</div>
+      ${dsc>0?`<div class="small"><s class="muted num">${fmt(lp)}</s> <span class="chip warn" style="font-size:11px;padding:1px 8px">−${pct.toFixed(1).replace('.0','')}% · −${fmt(dsc)} so'm</span></div>`:''}
+      ${canDisc()?`<div class="row" style="gap:6px;margin-top:4px;flex-wrap:nowrap"><input data-cp="${i}" type="number" step="1000" min="${minPrice({...c,listUzs:lp})}" max="${lp}" value="${c.priceUzs}" class="num" style="width:130px;padding:4px 8px" aria-label="Narx (so'm)" title="Narxni tushirish"><span class="small muted">${owner()?'chegarasiz':`eng kam: ${fmt(minPrice({...c,listUzs:lp}))} (−${discLim(c.line)}%)`}</span></div>`:''}</td>
       <td class="r"><div class="row" style="justify-content:flex-end;flex-wrap:nowrap"><button class="sm ghost" data-q="${i}" data-d="-1">−</button><span class="num">${c.qty}</span><button class="sm ghost" data-q="${i}" data-d="1">+</button></div></td>
-      <td class="r num">${fmt(c.priceUzs*c.qty)}</td><td><button class="sm ghost" data-rm="${i}" aria-label="O'chirish">✕</button></td></tr>`).join('')}
+      <td class="r num">${fmt(c.priceUzs*c.qty)}</td><td><button class="sm ghost" data-rm="${i}" aria-label="O'chirish">✕</button></td></tr>`}).join('')}
     </tbody></table></div>`:`<p class="muted">Savat bo'sh. Tovarni skanerlang.</p>`}
-    <div class="total"><span>Jami</span><span class="big">${fmt(total)} so'm</span></div>
+    ${(()=>{const d=cart.reduce((a,c)=>a+((c.listUzs||c.priceUzs)-c.priceUzs)*c.qty,0); return d>0?`<div class="row small" style="justify-content:space-between;margin-top:8px"><span>Chegirma</span><span class="num">−${fmt(d)} so'm</span></div>`:'';})()}
+    <div class="total"><span>Jami</span><span class="big">${fmt(total)} so'm<div class="small muted" style="font-size:.45em;text-align:right">≈ ${usd(total/S.rate)}</div></span></div>
     <div class="row" style="margin-top:12px">
       <select id="pay" style="width:auto"><option value="naqd">Naqd</option><option value="karta">Karta</option><option value="otkazma">O'tkazma</option>${canCredit()?'<option value="nasiya">Nasiya (qarzga)</option>':''}</select>
       <label class="row" style="gap:6px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)">Sana <input id="saleDate" type="date" value="${saleDate}" max="${today()}" style="width:auto"></label>
@@ -349,7 +360,7 @@ function addToCart(p){
   const inCart=cart.find(c=>c.id===p.id);
   const have=inCart?inCart.qty:0;
   if(have+1>p.qty){toast(`Omborda faqat ${p.qty} dona bor`);return;}
-  if(inCart) inCart.qty++; else cart.push({id:p.id,name:p.name,line:p.line,qty:1,priceUzs:priceUzs(p),costUsd:p.costUsd});
+  if(inCart) inCart.qty++; else cart.push({id:p.id,name:p.name,line:p.line,qty:1,priceUzs:priceUzs(p),listUzs:priceUzs(p),costUsd:p.costUsd});
   render(); setTimeout(()=>document.getElementById('scanIn')?.focus(),0);
 }
 
@@ -377,7 +388,7 @@ function vOmbor(){
     ${list.map(p=>`<tr><td>${esc(p.name)}<div><span class="chip" style="font-size:11px;padding:1px 8px;margin-top:3px">${LINE_SHORT[p.line]||'Kompyuter'}</span></div></td><td class="num small">${esc(p.barcode)}</td>
     <td class="r">${p.qty<=2?`<span class="chip ${p.qty?'warn':'bad'} num">${p.qty}</span>`:`<span class="num">${p.qty}</span>`}</td>
     ${owner()?`<td class="r num">${usd(p.costUsd)}</td><td class="r num">${p.sellUzs?`<span title="So'mda qat'iy narx — kurs o'zgarsa ham o'zgarmaydi">${fmt(p.sellUzs)} so'm</span>`:usd(p.sellUsd)}</td>`:''}
-    <td class="r num">${fmt(priceUzs(p))}</td><td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-label="${p.id}">Etiketka</button><button class="sm" data-stk="p${p.id}">Yopishtirgich</button></div></td></tr>`).join('')}
+    <td class="r num">${fmt(priceUzs(p))}<div class="small muted">${usd(usdP(p))}</div></td><td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-label="${p.id}">Etiketka</button><button class="sm" data-stk="p${p.id}">Yopishtirgich</button></div></td></tr>`).join('')}
     </tbody></table></div>
     ${owner()?'':`<div class="lock" style="margin-top:12px">${canStock()?'Kelish narxlari faqat rahbarga ko\'rinadi.':'Kelish narxi va kirim faqat rahbar rejimida ko\'rinadi.'}</div>`}
   </section>`;
@@ -512,7 +523,11 @@ function vSozlamalar(){
     <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" data-mod="returns" ${S.mods.returns!==false?'checked':''} style="width:auto"> Vazvrat (tovarni qaytarish)</label>
     <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" data-mod="credit" ${S.mods.credit!==false?'checked':''} style="width:auto"> Nasiya (mijozlar qarzi)</label>
     <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" data-mod="stockin" ${S.mods.stockin!==false?'checked':''} style="width:auto"> Xodimlar omborga tovar qo'shishi</label>
-    <p class="small muted" style="margin:0">O'chirilgan modul hech kimga, xodimlarga ham ko'rinmaydi. Ma'lumotlar o'chmaydi.</p></div></section>`:''}
+    <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" data-mod="discount" ${S.mods.discount!==false?'checked':''} style="width:auto"> Narx tushirib berish (chegirma)</label>
+    <p class="small muted" style="margin:0">O'chirilgan modul hech kimga, xodimlarga ham ko'rinmaydi. Ma'lumotlar o'chmaydi.</p></div></section>
+  <section class="panel"><h2>Narx tushirish chegarasi</h2><form id="discF" class="form">
+    ${Object.entries({noutbuk:'Noutbuklar',kompyuter:'Kompyuter / qismlar',servis:'Servis'}).map(([k,n])=>`<label>${n} (ko'pi bilan %)<input id="ds_${k}" type="number" min="0" max="100" step="0.5" value="${+(S.discount?.[k]??0)}" class="num"></label>`).join('')}
+    <div class="full row"><button class="pri">Saqlash</button><span class="small muted">Xodim savatda narxni shu foizdan ortiq tushira olmaydi (0 — umuman tushira olmaydi). Rahbar uchun chegara yo'q. Har bir xodimga ruxsat "Xodimlar" → "Ruxsatlar"da beriladi.</span></div></form></section>`:''}
   ${owner()?`<section class="panel"><h2>Printerlar</h2><form id="prF" class="form">
     <label>Chek va talon printeri<input id="pr_r" value="${esc(S.printers.receipt)}"></label>
     <label>Chek qog'ozi eni (mm)<input id="pr_w" type="number" min="40" max="120" value="${esc(S.printers.receiptW)}" class="num" list="rwl"></label>
@@ -584,14 +599,15 @@ function vXodimlar(){
     <td><div class="row" style="flex-wrap:nowrap">${u.role!=='owner'?`<button class="sm" data-view="${u.id}">Blokini ko'rish</button><button class="sm" data-setpin="${u.id}">Tahrirlash</button>${u.active?`<button class="sm ghost" data-active="0" data-u="${u.id}">O'chirish</button>`:`<button class="sm" data-active="1" data-u="${u.id}">Yoqish</button>`}`:''}</div></td></tr>`}).join('')}
   </tbody></table></div></section>
   <section class="panel"><h2>Ruxsatlar</h2>
-  <div class="tbl"><table><thead><tr><th>Xodim</th><th>Rasxod kiritish</th><th>Oyligini ko'rish</th><th>Qarz kiritish</th><th>Vazvrat</th><th>Nasiya</th><th>Omborga kirim</th></tr></thead><tbody>
+  <div class="tbl"><table><thead><tr><th>Xodim</th><th>Rasxod kiritish</th><th>Oyligini ko'rish</th><th>Qarz kiritish</th><th>Vazvrat</th><th>Nasiya</th><th>Omborga kirim</th><th>Narx tushirish</th></tr></thead><tbody>
   ${S.users.filter(u=>u.role!=='owner'&&u.active).map(u=>`<tr><td>${esc(u.name)}</td>
     <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canExpense" data-u="${u.id}" ${u.canExpense?'checked':''} ${S.mods.expenses?'':'disabled'} style="width:auto"> ${u.canExpense?'Yoqilgan':"O'chiq"}</label></td>
     <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="seeSalary" data-u="${u.id}" ${u.seeSalary?'checked':''} ${S.mods.salary?'':'disabled'} style="width:auto"> ${u.seeSalary?'Yoqilgan':"O'chiq"}</label></td>
     <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canDebt" data-u="${u.id}" ${u.canDebt?'checked':''} ${S.mods.debts!==false?'':'disabled'} style="width:auto"> ${u.canDebt?'Yoqilgan':"O'chiq"}</label></td>
     <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canReturn" data-u="${u.id}" ${u.canReturn?'checked':''} ${S.mods.returns!==false?'':'disabled'} style="width:auto"> ${u.canReturn?'Yoqilgan':"O'chiq"}</label></td>
     <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canCredit" data-u="${u.id}" ${u.canCredit?'checked':''} ${S.mods.credit!==false?'':'disabled'} style="width:auto"> ${u.canCredit?'Yoqilgan':"O'chiq"}</label></td>
-    <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canStock" data-u="${u.id}" ${u.canStock?'checked':''} ${S.mods.stockin!==false?'':'disabled'} style="width:auto"> ${u.canStock?'Yoqilgan':"O'chiq"}</label></td></tr>`).join('')}
+    <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canStock" data-u="${u.id}" ${u.canStock?'checked':''} ${S.mods.stockin!==false?'':'disabled'} style="width:auto"> ${u.canStock?'Yoqilgan':"O'chiq"}</label></td>
+    <td><label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg)"><input type="checkbox" data-perm="canDiscount" data-u="${u.id}" ${u.canDiscount?'checked':''} ${S.mods.discount!==false?'':'disabled'} style="width:auto"> ${u.canDiscount?`Yoqilgan`:"O'chiq"}</label></td></tr>`).join('')}
   </tbody></table></div>
   ${!S.mods.expenses||!S.mods.salary?'<p class="small muted">O\'chirilgan modullar Sozlamalarda yoqiladi.</p>':''}</section>
   ${S.mods.salary?`<section class="panel"><h2>Oylik hisobi · ${today().slice(0,7)}</h2>
@@ -904,7 +920,7 @@ function showSugg(q){
   const v = String(q||'').trim();
   if (v.length < 2 || S.products.some((p) => p.barcode === v)) { box.innerHTML = ''; return; }
   const m = findProducts(v);
-  box.innerHTML = m.slice(0, 10).map((p) => `<button type="button" data-add="${p.id}"><span>${esc(p.name)} <span class="muted small">· ${p.qty} dona</span></span><span class="num">${fmt(priceUzs(p))}</span></button>`).join('')
+  box.innerHTML = m.slice(0, 10).map((p) => `<button type="button" data-add="${p.id}"><span>${esc(p.name)} <span class="muted small">· ${p.qty} dona</span></span><span class="num" style="text-align:right">${fmt(priceUzs(p))} so'm<div class="small muted">${usd(usdP(p))}</div></span></button>`).join('')
     || `<div class="small muted" style="padding:6px 8px">"${esc(v)}" bo'yicha tovar topilmadi</div>`;
 }
 function payModal(id){
@@ -975,8 +991,8 @@ async function loadDay(d) {
     must(db.from('sales').select('*, sale_items(*, sale_item_costs(*))').gte('created_at', a).lte('created_at', b).order('created_at')),
     must(db.from('sale_returns').select('*, sale_items(name, sale_item_costs(cost_usd, rate)), sales(no)').gte('created_at', a).lte('created_at', b)),
   ]);
-  extraSales[d] = ss.map((s) => ({ id: s.id, no: s.no, ts: ms(s.created_at), enteredTs: ms(s.entered_at), userId: s.user_id, pay: s.pay, totalUzs: +s.total_uzs,
-    items: (s.sale_items || []).map((i) => { const c = one(i.sale_item_costs); return { id: i.id, name: i.name, line: i.line, qty: i.qty, priceUzs: +i.price_uzs, costUsd: +(c?.cost_usd || 0), rate: +(c?.rate || s.rate) }; }) }));
+  extraSales[d] = ss.map((s) => ({ id: s.id, no: s.no, ts: ms(s.created_at), enteredTs: ms(s.entered_at), userId: s.user_id, pay: s.pay, totalUzs: +s.total_uzs, rate: +s.rate || 0,
+    items: (s.sale_items || []).map((i) => { const c = one(i.sale_item_costs); return { id: i.id, name: i.name, line: i.line, qty: i.qty, priceUzs: +i.price_uzs, listUzs: +(i.list_price_uzs || i.price_uzs), costUsd: +(c?.cost_usd || 0), rate: +(c?.rate || s.rate) }; }) }));
   extraReturns[d] = rr.map(mapReturn);
 }
 async function refresh() {
@@ -1021,7 +1037,7 @@ async function refresh() {
     mods: st.mods, tg: st.tg, printers: st.printers,
     users: profs.map((p) => ({
       id: p.id, name: p.name, login: p.login, role: p.role, active: p.active,
-      canExpense: p.can_expense, seeSalary: p.see_salary, canDebt: p.can_debt, canReturn: p.can_return, canCredit: p.can_credit, canStock: p.can_stock,
+      canExpense: p.can_expense, seeSalary: p.see_salary, canDebt: p.can_debt, canReturn: p.can_return, canCredit: p.can_credit, canStock: p.can_stock, canDiscount: p.can_discount,
       oklad: +(payMap[p.id]?.oklad || 0), kpi: +(payMap[p.id]?.kpi || 0), kpiBase: payMap[p.id]?.kpi_base || 'foyda',
     })),
     products: prods.map((p) => ({ id: p.id, name: p.name, barcode: p.barcode, line: p.line, qty: p.qty, sellUsd: +p.sell_usd, sellUzs: p.sell_uzs == null ? null : +p.sell_uzs, costUsd: costMap[p.id] ?? 0 })),
@@ -1032,8 +1048,8 @@ async function refresh() {
       masterId: r.master_id, acceptedBy: r.accepted_by, doneTs: ms(r.done_at),
     })),
     sales: sales.map((s) => ({
-      id: s.id, no: s.no, ts: ms(s.created_at), enteredTs: ms(s.entered_at), userId: s.user_id, pay: s.pay, totalUzs: +s.total_uzs,
-      items: (s.sale_items || []).map((i) => { const c = one(i.sale_item_costs); return { id: i.id, name: i.name, line: i.line, qty: i.qty, priceUzs: +i.price_uzs, costUsd: +(c?.cost_usd || 0), rate: +(c?.rate || s.rate) }; }),
+      id: s.id, no: s.no, ts: ms(s.created_at), enteredTs: ms(s.entered_at), userId: s.user_id, pay: s.pay, totalUzs: +s.total_uzs, rate: +s.rate || 0,
+      items: (s.sale_items || []).map((i) => { const c = one(i.sale_item_costs); return { id: i.id, name: i.name, line: i.line, qty: i.qty, priceUzs: +i.price_uzs, listUzs: +(i.list_price_uzs || i.price_uzs), costUsd: +(c?.cost_usd || 0), rate: +(c?.rate || s.rate) }; }),
     })),
     expenses: exps.map((e) => ({ id: e.id, ts: ms(e.created_at), userId: e.user_id, cat: e.cat, amountUzs: +e.amount_uzs, note: e.note || '', toUser: e.to_user })),
     payroll: Object.fromEntries((pr.data || []).map((x) => [x.user_id, x])),
@@ -1041,6 +1057,7 @@ async function refresh() {
       name: d.item_name, qty: d.qty, amount: +d.amount, cur: d.currency, due: d.due_date, note: d.note || '', paid: +d.paid, closed: d.closed, barcode: d.barcode || '', productId: d.product_id })),
     returns: rets.map(mapReturn),
     credit: st.credit || { days: 30, limit: 0, remindDays: 3 },
+    discount: st.discount || { noutbuk: 5, kompyuter: 5, servis: 10 },
     cdebts: cdebts.map((d) => ({ id: d.id, ts: ms(d.created_at), saleId: d.sale_id, phone: d.client_phone, name: d.client_name, amount: +d.amount_uzs, paid: +d.paid_uzs,
       due: d.due_date, note: d.note || '', userId: d.user_id, closed: d.closed })),
     cpays: cpays.map((p) => ({ id: p.id, debtId: p.debt_id, ts: ms(p.created_at), amount: +p.amount_uzs, pay: p.pay, note: p.note || '' })),
@@ -1249,6 +1266,10 @@ document.addEventListener('submit', async (e) => {
         await must(db.from('customer_debts').insert({ user_id: S.cur, client_phone: ph, client_name: nm, amount_uzs: +v('od_sum'), due_date: v('od_due') || null, note: v('od_note') }));
       }, 'Eski qarz kiritildi');
     }
+    if (id === 'discF') {
+      const d = {}; for (const k of ['noutbuk', 'kompyuter', 'servis']) d[k] = Math.min(100, Math.max(0, +v('ds_' + k) || 0));
+      await act(() => settingsUpd({ discount: d }), 'Narx tushirish chegarasi saqlandi');
+    }
     if (id === 'credSetF') {
       await act(() => settingsUpd({ credit: { days: +v('cs_days') || 30, limit: +v('cs_limit') || 0, remindDays: +v('cs_rem') || 0 } }), 'Nasiya sozlamalari saqlandi');
     }
@@ -1316,6 +1337,13 @@ document.addEventListener('change', async (e) => {
     if (t.id === 'nFilter') { nFilter = t.value; render(); }
     if (t.id === 'salMon') { salMon = t.value; keepScroll(render); }
     if (t.id === 'k_cur') setKCur(t.value);
+    if (t.dataset.cp != null) {
+      const c = cart[+t.dataset.cp]; if (!c) return;
+      const lp = c.listUzs || c.priceUzs, mn = minPrice({ ...c, listUzs: lp }); let val = Math.round(+t.value || 0);
+      if (val > lp) { val = lp; toast("Asl narxdan yuqori qo'yib bo'lmaydi"); }
+      if (val < mn) { val = mn; toast(`Ko'pi bilan ${discLim(c.line)}% tushirish mumkin — eng kam narx ${fmt(mn)} so'm`); }
+      c.priceUzs = val; render();
+    }
     if (t.id === 'pay') { payMode = t.value; render(); }
     if (t.id === 'ns_phone' || t.id === 'ns_pre') keepScroll(render);
     if (t.id === 'saleDate') { saleDate = t.value && t.value <= today() ? t.value : today(); render(); }
@@ -1324,7 +1352,7 @@ document.addEventListener('change', async (e) => {
     if (t.id && t.id.startsWith('sk_')) { drawStickers(t.id === 'sk_size'); if (t.id === 'sk_wn' || t.id === 'sk_wu') { const n = document.getElementById('sk_wn').value, u = document.getElementById('sk_wu').value; if (stkCtx.pid) warSave(stkCtx.pid, n, u); else if (stkCtx.line === 'servis') warSave('servis', n, u); } }
     if (['lb_size', 'lb_w', 'lb_h', 'lb_n', 'lb_price', 'lb_wn', 'lb_wu', 'lb_noct'].includes(t.id)) drawLabels(t.id === 'lb_size');
     if (t.dataset.perm) {
-      const col = { canExpense: 'can_expense', seeSalary: 'see_salary', canDebt: 'can_debt', canReturn: 'can_return', canCredit: 'can_credit', canStock: 'can_stock' }[t.dataset.perm];
+      const col = { canExpense: 'can_expense', seeSalary: 'see_salary', canDebt: 'can_debt', canReturn: 'can_return', canCredit: 'can_credit', canStock: 'can_stock', canDiscount: 'can_discount' }[t.dataset.perm];
       await act(() => must(db.from('profiles').update({ [col]: t.checked }).eq('id', t.dataset.u)), t.checked ? 'Ruxsat yoqildi' : "Ruxsat o'chirildi");
     }
     if (t.dataset.mod) await act(() => settingsUpd({ mods: { ...S.mods, [t.dataset.mod]: t.checked } }), t.checked ? 'Modul yoqildi' : "Modul o'chirildi");
@@ -1453,7 +1481,7 @@ document.addEventListener('click', async (e) => {
       b.disabled = true;
       const pm = document.getElementById('pay').value;
       if (pm === 'nasiya' && (!nas.phone.trim() || !nas.name.trim())) { b.disabled = false; return toast("Nasiya uchun mijozning telefoni va ismini yozing"); }
-      const args = { p_items: cart.map((c) => ({ product_id: c.id, qty: c.qty })), p_pay: pm, p_date: saleDate && saleDate !== today() ? saleDate : null };
+      const args = { p_items: cart.map((c) => (c.listUzs && c.priceUzs !== c.listUzs ? { product_id: c.id, qty: c.qty, price: c.priceUzs } : { product_id: c.id, qty: c.qty })), p_pay: pm, p_date: saleDate && saleDate !== today() ? saleDate : null };
       if (pm === 'nasiya') Object.assign(args, { p_client: nas.phone, p_client_name: nas.name.trim(), p_prepaid: +nas.prepaid || 0, p_due: nas.due || null, p_note: nas.note });
       let res;
       try { res = await act(() => must(db.rpc('make_sale', args))); } catch { b.disabled = false; return; }
