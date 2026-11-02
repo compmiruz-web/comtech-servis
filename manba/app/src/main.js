@@ -893,6 +893,20 @@ async function camScan(onCode){
     if(m) m.textContent=e?.name==='NotAllowedError'?'Kameraga ruxsat berilmadi. Brauzer manzil satridagi 🔒 belgisidan kameraga ruxsat bering.':e?.name==='NotFoundError'?'Kamera topilmadi. USB skaner ulang yoki kodni qo\'lda yozing.':'Kamera ochilmadi: '+(e?.message||e);
   }
 }
+// Sotuvda qidirish: nomidagi har bir so'z yoki shtrix-kod bo'yicha (raqamlar ham, masalan 5070)
+function findProducts(q){
+  const words = String(q||'').toLowerCase().split(/\s+/).filter(Boolean); if (!words.length) return [];
+  return S.products.filter((p) => { const h = (p.name + ' ' + p.barcode).toLowerCase(); return words.every((w) => h.includes(w)); })
+    .sort((a, b) => (b.qty > 0) - (a.qty > 0) || a.name.localeCompare(b.name));
+}
+function showSugg(q){
+  const box = document.getElementById('sugg'); if (!box) return;
+  const v = String(q||'').trim();
+  if (v.length < 2 || S.products.some((p) => p.barcode === v)) { box.innerHTML = ''; return; }
+  const m = findProducts(v);
+  box.innerHTML = m.slice(0, 10).map((p) => `<button type="button" data-add="${p.id}"><span>${esc(p.name)} <span class="muted small">· ${p.qty} dona</span></span><span class="num">${fmt(priceUzs(p))}</span></button>`).join('')
+    || `<div class="small muted" style="padding:6px 8px">"${esc(v)}" bo'yicha tovar topilmadi</div>`;
+}
 function payModal(id){
   const u=S.users.find(x=>x.id===id), p=payroll(u);
   modal(`<h3>${esc(u.name)}: oylik sozlamasi</h3><form id="payF" data-u="${u.id}" style="display:grid;gap:10px">
@@ -1144,9 +1158,10 @@ document.addEventListener('submit', async (e) => {
       const val = v('scanIn'); if (!val) return;
       const p = S.products.find((p) => p.barcode === val);
       if (p) return addToCart(p);
-      const m = S.products.filter((p) => p.name.toLowerCase().includes(val.toLowerCase()));
-      if (m.length === 1) return addToCart(m[0]);
-      return toast(m.length ? 'Bir nechta tovar topildi, ro\'yxatdan tanlang' : 'Bu shtrix-kod omborda yo\'q');
+      const m = findProducts(val);
+      if (m.length === 1) { document.getElementById('scanIn').value = ''; showSugg(''); return addToCart(m[0]); }
+      showSugg(val);
+      return toast(m.length ? `${m.length} ta tovar topildi — pastdagi ro'yxatdan tanlang` : 'Bunday tovar omborda yo\'q');
     }
     if (id === 'kirimF') {
       const q = +v('k_qty'), name = v('k_name');
@@ -1260,10 +1275,7 @@ const must0 = (r) => { if (r.error) throw r.error; return r.data; };
 document.addEventListener('input', (e) => {
   const t = e.target;
   if (t.id === 'scanIn') {
-    const val = t.value.trim().toLowerCase(); const box = document.getElementById('sugg');
-    if (val.length < 2 || /^\d+$/.test(val)) { box.innerHTML = ''; return; }
-    box.innerHTML = S.products.filter((p) => p.name.toLowerCase().includes(val)).slice(0, 6)
-      .map((p) => `<button type="button" data-add="${p.id}"><span>${esc(p.name)} <span class="muted small">· ${p.qty} dona</span></span><span class="num">${fmt(priceUzs(p))}</span></button>`).join('');
+    showSugg(t.value);
   }
   const keep = (id, set) => { if (t.id !== id) return; set(t.value); const pos = t.selectionStart; render(); const n = document.getElementById(id); n.focus(); n.setSelectionRange(pos, pos); };
   keep('oSearch', (x) => (oSearch = x)); keep('cSearch', (x) => (cSearch = x)); keep('rSearch', (x) => (rSearch = x)); keep('dSearch', (x) => (dSearch = x)); keep('nSearch', (x) => (nSearch = x));
@@ -1430,7 +1442,7 @@ document.addEventListener('click', async (e) => {
         <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div></form>`);
     }
     if (b.hasAttribute('data-close')) closeModal();
-    if (b.dataset.add) { const p = S.products.find((p) => p.id === b.dataset.add); document.getElementById('scanIn').value = ''; addToCart(p); }
+    if (b.dataset.add) { const p = S.products.find((p) => p.id === b.dataset.add); document.getElementById('scanIn').value = ''; showSugg(''); addToCart(p); }
     if (b.dataset.q !== undefined) {
       const c = cart[+b.dataset.q]; const p = S.products.find((p) => p.id === c.id); const n = c.qty + +b.dataset.d;
       if (n > p.qty) return toast(`Omborda faqat ${p.qty} dona bor`);
