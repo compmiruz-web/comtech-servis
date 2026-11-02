@@ -116,6 +116,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
 .scan button{white-space:nowrap}
 .tbl{overflow-x:auto;margin-inline:-4px}
 table{width:100%;border-collapse:collapse;font-size:14px}
+th.srt{cursor:pointer;user-select:none}th.srt:hover{color:var(--fg,inherit)}th.srt[data-dir=asc]::after{content:' ▲'}th.srt[data-dir=desc]::after{content:' ▼'}
 th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
 td{padding:11px 8px;border-bottom:1px dashed var(--line);vertical-align:middle}
 tbody tr:last-child td{border-bottom:0}

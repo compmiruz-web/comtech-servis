@@ -1032,6 +1032,50 @@ function render(){
   const df=document.getElementById('dFilter'); if(df) df.value=dFilter;
   const nf=document.getElementById('nFilter'); if(nf) nf.value=nFilter;
   const ps=document.getElementById('pay'); if(ps&&[...ps.options].some(o=>o.value===payMode)) ps.value=payMode; else payMode='naqd';
+  enhanceTables();
+}
+/* ---------- Jadval ustunlari bo'yicha saralash (sarlavhani bosish: o'sish / kamayish) ---------- */
+const SORT_KEY='comtech_sort';
+let sortState=(()=>{try{return JSON.parse(localStorage.getItem(SORT_KEY))||{};}catch{return {};}})();
+function sortSave(){try{localStorage.setItem(SORT_KEY,JSON.stringify(sortState));}catch{}}
+function cellKey(td){
+  if(!td) return '';
+  if(td.dataset.sort!=null) return td.dataset.sort;
+  const sel=td.querySelector('select'); if(sel) return sel.options[sel.selectedIndex]?.text||'';
+  const inp=td.querySelector('input'); if(inp) return inp.value;
+  for(const n of td.childNodes){const t=n.textContent.trim(); if(t) return t;}
+  return '';
+}
+function sortVal(s){
+  s=String(s).trim();
+  const d=s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\D+(\d{1,2}):(\d{2}))?/);
+  if(d) return [0,+(d[3]+d[2].padStart(2,'0')+d[1].padStart(2,'0')+(d[4]||'0').padStart(2,'0')+(d[5]||'00'))];
+  const n=s.replace(/^[№#]\s*/,'').replace(/[\s\u00a0]/g,'').match(/^[-−]?\d+(?:[.,]\d+)?/);
+  if(n) return [0,parseFloat(n[0].replace('−','-').replace(',','.'))];
+  return [1,s.toLowerCase()];
+}
+function enhanceTables(){
+  document.querySelectorAll('#main table').forEach((tbl,i)=>{
+    const head=tbl.tHead?.rows[0], body=tbl.tBodies[0]; if(!head||!body) return;
+    const sec=tbl.closest('section'); const id=tab+'|'+(sec?.querySelector('h2')?.textContent.trim().slice(0,40)||'')+'|'+i;
+    const ths=[...head.cells];
+    ths.forEach((th,ci)=>{
+      if(!th.textContent.trim()) return;
+      th.classList.add('srt'); th.title='Saralash';
+      th.onclick=()=>{const st=sortState[id]; sortState[id]={c:ci,d:st&&st.c===ci?-st.d:1}; sortSave(); applySort(tbl,id);};
+    });
+    applySort(tbl,id);
+  });
+}
+function applySort(tbl,id){
+  const st=sortState[id], head=tbl.tHead.rows[0], body=tbl.tBodies[0];
+  [...head.cells].forEach((th,ci)=>{th.dataset.dir=st&&st.c===ci?(st.d>0?'asc':'desc'):'';});
+  if(!st) return;
+  const rows=[...body.rows]; if(rows.some(r=>r.querySelector('td[colspan]'))&&rows.length<2) return;
+  const keyed=rows.map((r,ix)=>({r,ix,k:sortVal(cellKey(r.cells[st.c]))}));
+  keyed.sort((a,b)=>{const x=a.k,y=b.k; if(x[0]!==y[0]) return (x[0]-y[0])*st.d;
+    const c=x[0]?x[1].localeCompare(y[1],'uz',{numeric:true}):x[1]-y[1]; return (c||a.ix-b.ix)*st.d;});
+  const f=document.createDocumentFragment(); keyed.forEach(o=>f.appendChild(o.r)); body.appendChild(f);
 }
 function route(){const h=location.hash.slice(1); if(views[h]) tab=h; render(); if(tab==='sotuv') setTimeout(()=>document.getElementById('scanIn')?.focus(),0);}
 window.addEventListener('hashchange',route);
