@@ -360,7 +360,7 @@ function salesTable(list){
     return `<tr><td class="num">${s.no?'№'+s.no:''}<div class="small muted num">${late?`${dS(s.ts)} · kiritildi ${dts(s.enteredTs)}`:tS(s.ts)}</div></td>
   <td>${s.items.map(i=>{const b=returnedQty(i.id);return esc(i.name)+' ×'+i.qty+(b?` <span class="chip bad" style="font-size:11px;padding:1px 7px">${b} qaytgan</span>`:'');}).join('<br>')}</td><td>${esc(uName(s.userId))}</td><td>${esc(s.pay)}</td><td class="r num">${fmt(s.totalUzs)}</td>
   ${owner()?`<td class="r num">${fmt(saleProfit(s))}</td>`:''}
-  <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-receipt="${s.id}">Chek</button>${canReturn()?`<button class="sm" data-return="${s.id}">Vazvrat</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`;
+  <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-receipt="${s.id}">Chek</button>${canReturn()?`<button class="sm" data-return="${s.id}">Vazvrat</button>`:''}${owner()?`<button class="sm" data-sedit="${s.id}" title="Narx, soni, to'lov turi, vaqtini o'zgartirish">✎</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`;
 }
 const saleCost=s=>s.items.reduce((a,i)=>a+i.costUsd*i.rate*i.qty,0);
 const saleProfit=s=>s.totalUzs-saleCost(s);
@@ -396,10 +396,54 @@ function vOmbor(){
     ${list.map(p=>`<tr><td>${esc(p.name)}<div><span class="chip" style="font-size:11px;padding:1px 8px;margin-top:3px">${LINE_SHORT[p.line]||'Kompyuter'}</span></div></td><td class="num small">${esc(p.barcode)}</td>
     <td class="r">${p.qty<=2?`<span class="chip ${p.qty?'warn':'bad'} num">${p.qty}</span>`:`<span class="num">${p.qty}</span>`}</td>
     ${owner()?`<td class="r num">${usd(p.costUsd)}</td><td class="r num">${p.sellUzs?`<span title="So'mda qat'iy narx — kurs o'zgarsa ham o'zgarmaydi">${fmt(p.sellUzs)} so'm</span>`:usd(p.sellUsd)}</td>`:''}
-    <td class="r num">${fmt(priceUzs(p))}<div class="small muted">${usd(usdP(p))}</div></td><td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-label="${p.id}">Etiketka</button><button class="sm" data-stk="p${p.id}">Yopishtirgich</button></div></td></tr>`).join('')}
+    <td class="r num">${fmt(priceUzs(p))}<div class="small muted">${usd(usdP(p))}</div></td><td><div class="row" style="flex-wrap:nowrap">${owner()?`<button class="sm" data-pedit="${p.id}" title="Barcha parametrlarni o'zgartirish">✎</button>`:''}<button class="sm" data-label="${p.id}">Etiketka</button><button class="sm" data-stk="p${p.id}">Yopishtirgich</button></div></td></tr>`).join('')}
     </tbody></table></div>
     ${owner()?'':`<div class="lock" style="margin-top:12px">${canStock()?'Kelish narxlari faqat rahbarga ko\'rinadi.':'Kelish narxi va kirim faqat rahbar rejimida ko\'rinadi.'}</div>`}
-  </section>`;
+  </section>
+  ${owner()?movesPanel():''}`;
+}
+const MV_N={kirim:'Kirim',sotuv:'Sotuv (chiqim)',tuzatish:'Tuzatish'};
+let mvFilter='hammasi';
+function movesPanel(){
+  const pn=id=>S.products.find(p=>p.id===id)?.name||'(o\'chirilgan tovar)';
+  let list=S.moves||[]; if(mvFilter!=='hammasi') list=list.filter(m=>m.reason===mvFilter);
+  return `<section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Kirim-chiqim tarixi</h2>
+    <select id="mvFilter" style="width:auto">${[['hammasi','Hammasi'],['kirim','Kirim'],['sotuv','Sotuv (chiqim)'],['tuzatish','Tuzatish']].map(([k,n])=>`<option value="${k}" ${k===mvFilter?'selected':''}>${n}</option>`).join('')}</select></div>
+  <div class="tbl"><table><thead><tr><th>Vaqt</th><th>Tovar</th><th>Turi</th><th class="r">Soni</th><th>Kim</th><th></th></tr></thead><tbody>
+  ${list.slice(0,200).map(m=>`<tr><td class="num small">${dts(m.ts)}</td><td>${esc(pn(m.productId))}${m.ref?`<div class="small muted">${esc(m.ref)}</div>`:''}</td><td>${MV_N[m.reason]||esc(m.reason)}</td>
+    <td class="r num"><b style="color:${m.delta>0?'var(--ok,#2bb673)':'var(--bad,#e5484d)'}">${m.delta>0?'+':''}${m.delta}</b></td><td class="small">${esc(uName(m.userId))}</td>
+    <td>${m.reason==='sotuv'?'':`<button class="sm" data-mvedit="${m.id}" title="Sonini o'zgartirish">✎</button>`}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">Hali harakat yo\'q</td></tr>'}
+  </tbody></table></div><p class="small muted" style="margin:6px 0 0">Kirim yoki tuzatish sonini o'zgartirsangiz, ombordagi qoldiq farq qadar o'zgaradi. Sotuvni "Sotuv" bo'limidagi ✎ tugmasi bilan tahrirlang.</p></section>`;
+}
+function productEditModal(id){
+  const p=id?S.products.find(x=>x.id===id):{name:'',barcode:genBarcode(),line:'kompyuter',qty:0,costUsd:0,sellUsd:0,sellUzs:null};
+  const cur=p.sellUzs?'uzs':'usd';
+  modal(`<h3>${id?'Tovarni tahrirlash':'Yangi tovar'}</h3><form id="peditF" data-p="${id||''}" style="display:grid;gap:10px">
+    <label>Nomi / parametrlari<textarea id="pe_name" rows="3" required>${esc(p.name)}</textarea></label>
+    <label>Shtrix-kod<span class="row" style="flex-wrap:nowrap"><input id="pe_bar" required value="${esc(p.barcode)}" class="num"><button type="button" class="sm" data-cam="pe_bar">📷</button><button type="button" class="sm" data-genbar="pe_bar">Yangi</button></span></label>
+    <div class="row" style="flex-wrap:nowrap;gap:10px"><label style="flex:1">Yo'nalish<select id="pe_line"><option value="noutbuk" ${p.line==='noutbuk'?'selected':''}>Noutbuk</option><option value="kompyuter" ${p.line==='kompyuter'||!p.line?'selected':''}>Kompyuter / qism</option><option value="servis" ${p.line==='servis'?'selected':''}>Servis</option></select></label>
+    <label style="flex:1">Omborda (dona)<input id="pe_qty" type="number" min="0" step="1" value="${p.qty}" class="num"></label></div>
+    <label>Kelish narxi (1 dona)<span class="row" style="flex-wrap:nowrap"><input id="pe_cost" type="number" min="0" step="any" value="${p.costUsd}" class="num" style="flex:1"><select id="pe_ccur" style="width:auto"><option value="usd" selected>$</option><option value="uzs">so'm</option></select></span></label>
+    <label>Sotish narxi (1 dona)<span class="row" style="flex-wrap:nowrap"><input id="pe_sell" type="number" min="0" step="any" value="${cur==='uzs'?p.sellUzs:p.sellUsd}" class="num" style="flex:1"><select id="pe_scur" style="width:auto"><option value="usd" ${cur==='usd'?'selected':''}>$ (kurs bo'yicha)</option><option value="uzs" ${cur==='uzs'?'selected':''}>so'm (qat'iy)</option></select></span></label>
+    <p class="small muted" style="margin:0" id="pe_hint">Kurs: 1$ = ${fmt(S.rate)} so'm. Soni o'zgarsa, ombor tarixiga "Tuzatish" bo'lib yoziladi.</p>
+    <div class="row" style="justify-content:space-between">${id?`<button type="button" class="ghost" data-pdel="${id}" style="color:var(--bad,#e5484d)">Tovarni o'chirish</button>`:'<span></span>'}<span class="row"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></span></div></form>`);
+}
+function saleEditModal(id){
+  const sl=[...S.sales, ...Object.values(extraSales).flat()].find(x=>x.id===id); if(!sl) return;
+  const loc=new Date(sl.ts), pad=n=>String(n).padStart(2,'0');
+  modal(`<h3>Sotuv №${sl.no||''}ni tahrirlash</h3>
+    <form id="seditF" data-s="${sl.id}" style="display:grid;gap:10px">
+      <div class="row" style="flex-wrap:nowrap;gap:10px"><label style="flex:1">Sana<input id="se_d" type="date" value="${loc.toLocaleDateString('en-CA')}"></label><label style="flex:1">Vaqt<input id="se_t" type="time" step="1" value="${pad(loc.getHours())}:${pad(loc.getMinutes())}:${pad(loc.getSeconds())}"></label></div>
+      <label>To'lov turi<select id="se_pay" ${sl.pay==='nasiya'?'disabled':''}>${['naqd','karta','otkazma'].concat(sl.pay==='nasiya'?['nasiya']:[]).map(k=>`<option value="${k}" ${k===sl.pay?'selected':''}>${PAYN[k]}</option>`).join('')}</select></label>
+      <div class="row" style="justify-content:flex-end"><button class="pri">Sana / to'lovni saqlash</button></div></form>
+    <hr>
+    ${sl.items.map(i=>`<form class="sitemF" data-i="${i.id}" style="display:grid;gap:6px;margin-bottom:10px">
+      <b class="small">${esc(i.name)}</b>
+      <div class="row" style="flex-wrap:nowrap;gap:8px"><label style="flex:1">Soni<input name="q" type="number" min="1" step="1" value="${i.qty}" class="num"></label>
+      <label style="flex:2">Narxi (1 dona, so'm)<input name="p" type="number" min="0" step="1000" value="${i.priceUzs}" class="num"></label>
+      <button class="sm pri" style="align-self:end">Saqlash</button></div></form>`).join('')}
+    <p class="small muted" style="margin:0">Soni o'zgarsa ombordagi qoldiq ham o'zgaradi. Nasiyali sotuvda mijoz qarzi ham yangilanadi.</p>
+    <div class="row" style="justify-content:space-between;margin-top:8px"><button type="button" class="ghost" data-sdel="${sl.id}" style="color:var(--bad,#e5484d)">Sotuvni bekor qilish</button><button type="button" data-close>Yopish</button></div>`);
 }
 
 /* ---------- USTAXONA ---------- */
@@ -1032,10 +1076,11 @@ async function refresh() {
   const dpays = debtIds.length ? await must(db.from('debt_payments').select('*').in('debt_id', debtIds).order('created_at')) : [];
   const isOwn = profs.some((p) => p.id === uid && p.role === 'owner');
   const soft = (pr) => Promise.resolve(pr).then((r) => (r.error ? [] : r.data || []), () => []);
-  const [salPays, notifs, monthR] = await Promise.all([
+  const [salPays, notifs, monthR, moves] = await Promise.all([
     soft(db.from('expenses').select('*').eq('cat', 'oylik').order('created_at', { ascending: false }).limit(1000)),
     isOwn ? soft(db.from('notifications').select('*').order('created_at', { ascending: false }).limit(150)) : Promise.resolve([]),
     isOwn ? Promise.resolve(db.rpc('month_summary', { p_month: today().slice(0, 7) })).catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+    isOwn ? soft(db.from('stock_moves').select('*').order('created_at', { ascending: false }).limit(300)) : Promise.resolve([]),
   ]);
   if (S?.notifs && isOwn) {
     const known = new Set(S.notifs.map((n) => n.id + ':' + n.ts));
@@ -1078,6 +1123,7 @@ async function refresh() {
     salPays: salPays.map((e) => ({ id: e.id, ts: ms(e.created_at), userId: e.user_id, toUser: e.to_user, amountUzs: +e.amount_uzs, note: e.note || '', pay: e.pay || 'naqd' })),
     notifs: notifs.map((n) => ({ id: n.id, ts: ms(n.created_at), kind: n.kind, level: n.level, title: n.title, body: n.body || '', read: n.read })),
     month: monthR?.data || null,
+    moves: moves.map((m) => ({ id: m.id, ts: ms(m.created_at), productId: m.product_id, delta: m.delta, reason: m.reason, userId: m.user_id, ref: m.ref || '' })),
     debtPays: dpays.map((x) => ({ id: x.id, debtId: x.debt_id, ts: ms(x.created_at), amount: +x.amount, note: x.note || '' })),
   };
   Object.assign(CLK, { tz: S.clock.tz || 'Asia/Tashkent', adj: +S.clock.adj || 0, sync: S.clock.sync !== false });
@@ -1287,6 +1333,27 @@ document.addEventListener('submit', async (e) => {
         await must(db.from('customer_debts').insert({ user_id: S.cur, client_phone: ph, client_name: nm, amount_uzs: +v('od_sum'), due_date: v('od_due') || null, note: v('od_note') }));
       }, 'Eski qarz kiritildi');
     }
+    if (id === 'peditF') {
+      const pid = e.target.dataset.p || null, cc = v('pe_ccur'), sc = v('pe_scur'), cost = v('pe_cost'), sell = v('pe_sell');
+      const body = { id: pid, name: v('pe_name').trim(), barcode: v('pe_bar').trim(), line: v('pe_line'), qty: Math.max(0, Math.round(+v('pe_qty') || 0)),
+        cost_usd: cost === '' ? null : (cc === 'uzs' ? Math.round(+cost / S.rate * 100) / 100 : +cost) };
+      if (sell !== '') { if (sc === 'uzs') body.sell_uzs = Math.round(+sell); else { body.sell_usd = +sell; body.sell_uzs = null; } }
+      await act(() => db.rpc('owner_product_save', { p: body }).then(must0), 'Tovar saqlandi');
+      closeModal();
+    }
+    if (id === 'seditF') {
+      const ts = new Date(`${v('se_d')}T${v('se_t') || '12:00:00'}`);
+      await act(() => db.rpc('owner_sale_edit', { p_sale: e.target.dataset.s, p_pay: document.getElementById('se_pay').disabled ? null : v('se_pay'), p_ts: ts.toISOString() }).then(must0), 'Sotuv yangilandi');
+      for (const k of Object.keys(extraSales)) delete extraSales[k];
+      saleEditModal(e.target.dataset.s);
+    }
+    if (e.target.classList?.contains('sitemF')) {
+      const f = e.target, sid = document.getElementById('seditF')?.dataset.s;
+      await act(() => db.rpc('owner_sale_item_edit', { p_item: +f.dataset.i, p_qty: Math.round(+f.querySelector('[name=q]').value || 1), p_price: Math.round(+f.querySelector('[name=p]').value || 0) }).then(must0), 'Sotuv qatori yangilandi');
+      for (const k of Object.keys(extraSales)) delete extraSales[k];
+      if (sid) saleEditModal(sid);
+    }
+    if (id === 'mvF') { await act(() => db.rpc('owner_move_edit', { p_id: +e.target.dataset.m, p_delta: Math.round(+v('mv_d') || 0) }).then(must0), 'Ombor harakati yangilandi'); closeModal(); }
     if (id === 'clkF') {
       await act(() => settingsUpd({ clock: { tz: v('ck_tz'), adj: Math.round(+v('ck_adj') || 0), sync: document.getElementById('ck_sync').checked } }), 'Soat sozlamasi saqlandi');
     }
@@ -1361,6 +1428,7 @@ document.addEventListener('change', async (e) => {
     if (t.id === 'nFilter') { nFilter = t.value; render(); }
     if (t.id === 'salMon') { salMon = t.value; keepScroll(render); }
     if (t.id === 'k_cur') setKCur(t.value);
+    if (t.id === 'mvFilter') { mvFilter = t.value; keepScroll(render); }
     if (t.id === 'ck_tz' || t.id === 'ck_adj' || t.id === 'ck_sync') { CLK.tz = document.getElementById('ck_tz').value; CLK.adj = +document.getElementById('ck_adj').value || 0; CLK.sync = document.getElementById('ck_sync').checked; const pv = document.getElementById('ckPrev'); if (pv) pv.textContent = dts(nowFix()); }
     if (t.dataset.cp != null || t.dataset.cd != null || t.dataset.cu != null) {
       const i = +(t.dataset.cp ?? t.dataset.cd ?? t.dataset.cu), c = cart[i]; if (!c) return;
@@ -1452,6 +1520,18 @@ document.addEventListener('click', async (e) => {
       const k = b.dataset.stk;
       if (k[0] === 'r') { const r = S.repairs.find((x) => x.talon == k.slice(1)); stickerModal({ line: 'servis', ref: '№' + r.talon, war: warLoad('servis', 'servis'), from: r.doneTs || Date.now() }); }
       else { const p = S.products.find((x) => x.id === k.slice(1)); stickerModal({ line: p.line, war: warLoad(p.id, p.line), pid: p.id, name: p.name }); }
+    }
+    if (b.dataset.pedit) productEditModal(b.dataset.pedit);
+    if (b.dataset.pdel) modal(`<h3>Tovarni o'chirish</h3><p>${esc(S.products.find((p) => p.id === b.dataset.pdel)?.name || '')} butunlay o'chirilsinmi? Sotuvlar tarixida nomi saqlanib qoladi.</p><div class="row" style="justify-content:flex-end"><button type="button" data-close>Yo'q</button><button class="pri" data-pdelyes="${b.dataset.pdel}">Ha, o'chirish</button></div>`);
+    if (b.dataset.pdelyes) { await act(() => db.rpc('owner_product_delete', { p_id: b.dataset.pdelyes }).then(must0), "Tovar o'chirildi"); closeModal(); }
+    if (b.dataset.sedit) saleEditModal(b.dataset.sedit);
+    if (b.dataset.sdel) modal(`<h3>Sotuvni bekor qilish</h3><p>Sotuv butunlay o'chiriladi, tovarlar omborga qaytadi. Davom etilsinmi?</p><div class="row" style="justify-content:flex-end"><button type="button" data-close>Yo'q</button><button class="pri" data-sdelyes="${b.dataset.sdel}">Ha, bekor qilish</button></div>`);
+    if (b.dataset.sdelyes) { await act(() => db.rpc('owner_sale_delete', { p_sale: b.dataset.sdelyes }).then(must0), 'Sotuv bekor qilindi'); for (const k of Object.keys(extraSales)) delete extraSales[k]; closeModal(); }
+    if (b.dataset.mvedit) {
+      const m = S.moves.find((x) => String(x.id) === b.dataset.mvedit);
+      modal(`<h3>Ombor harakatini o'zgartirish</h3><p class="small muted">${esc(S.products.find((p) => p.id === m.productId)?.name || '')} · ${dts(m.ts)} · ${MV_N[m.reason] || m.reason}</p>
+        <form id="mvF" data-m="${m.id}" style="display:grid;gap:10px"><label>Soni (+ kirim, − chiqim; 0 — yozuvni o'chirish)<input id="mv_d" type="number" step="1" value="${m.delta}" class="num" style="font-size:20px"></label>
+        <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div></form>`);
     }
     if (b.dataset.ckadj) { const i = document.getElementById('ck_adj'); i.value = (+i.value || 0) + (+b.dataset.ckadj); CLK.adj = +i.value; const pv = document.getElementById('ckPrev'); if (pv) pv.textContent = dts(nowFix()); }
     if (b.dataset.war) {
