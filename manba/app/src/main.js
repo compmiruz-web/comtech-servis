@@ -242,7 +242,8 @@ function applySkin(){document.documentElement.dataset.skin=S.skin||'yashil';}
 const priceUzs=p=>p.sellUzs?+p.sellUzs:Math.ceil(p.sellUsd*S.rate/1000)*1000;
 let kCur=(()=>{try{return localStorage.getItem('comtech_kcur')||'usd'}catch{return 'usd'}})();
 const kSym=()=>kCur==='uzs'?"so'm":'$';
-let cart=[]; let tab='sotuv'; let rFilter='aktiv'; let rSearch=''; let oSearch=''; let cSearch='';
+const tn=n=>String(n).padStart(4,'0');
+let cart=[]; let tab='sotuv'; let rFilter='hammasi'; let rSearch=''; let oSearch=''; let cSearch='';
 
 function toast(t){const el=document.getElementById('toast');el.textContent=t;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,2600);}
 
@@ -465,10 +466,10 @@ function saleEditModal(id){
 /* ---------- USTAXONA ---------- */
 function vUstaxona(){
   const q=rSearch.toLowerCase().replace(/^t(?=\d)/,'');
-  let list=S.repairs.slice().reverse();
+  let list=S.repairs.slice().sort((a,b)=>b.talon-a.talon);
   if(rFilter==='aktiv') list=list.filter(r=>r.status!=='berildi');
   else if(rFilter!=='hammasi') list=list.filter(r=>r.status===rFilter);
-  if(q) list=list.filter(r=>String(r.talon).includes(q)||r.phone.includes(q)||r.name.toLowerCase().includes(q)||(r.model||'').toLowerCase().includes(q));
+  if(q) list=list.filter(r=>tn(r.talon).includes(q)||r.phone.includes(q)||r.name.toLowerCase().includes(q)||(r.model||'').toLowerCase().includes(q));
   return `<section class="panel"><h2>Qurilma qabul qilish · keyingi talon <span class="talonno">№${S.nextTalon}</span></h2>
     <form id="qabulF" class="form">
       <label>Telefon raqami<input id="r_phone" required inputmode="tel" placeholder="+998 90 123 45 67" list="phones"></label>
@@ -485,11 +486,11 @@ function vUstaxona(){
     </form></section>
   <section class="panel">
     <div class="row" style="margin-bottom:10px">
-      <select id="rFilter" style="width:auto"><option value="aktiv">Faol (topshirilmagan)</option>${STATUSES.map(s=>`<option value="${s[0]}">${s[1]}</option>`).join('')}<option value="hammasi">Hammasi</option></select>
+      <select id="rFilter" style="width:auto"><option value="hammasi" ${rFilter==='hammasi'?'selected':''}>Hammasi</option><option value="aktiv" ${rFilter==='aktiv'?'selected':''}>Faol (topshirilmagan)</option>${STATUSES.map(s=>`<option value="${s[0]}" ${rFilter===s[0]?'selected':''}>${s[1]}</option>`).join('')}</select>
       <input id="rSearch" placeholder="Talon №, telefon, ism…" value="${esc(rSearch)}" style="flex:1;min-width:160px">
     </div>
     <div class="tbl"><table><thead><tr><th>Talon</th><th>Mijoz</th><th>Qurilma / muammo</th><th>Holati</th><th class="r">Narx</th><th></th></tr></thead><tbody>
-    ${list.map(r=>`<tr><td class="talonno">№${r.talon}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div></td>
+    ${list.map(r=>`<tr><td class="talonno">№${tn(r.talon)}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div></td>
       <td>${esc(r.name)}<div class="small muted num">${esc(r.phone)}</div></td>
       <td>${esc(r.device)}${r.model?' · '+esc(r.model):''}<div class="small muted">${esc(r.problem)}</div><div class="small muted">Usta: ${esc(uName(r.masterId))}</div></td>
       <td><select data-st="${r.talon}" style="width:auto;padding:4px 8px" aria-label="Holati">${STATUSES.map(s=>`<option value="${s[0]}" ${s[0]===r.status?'selected':''}>${s[1]}</option>`).join('')}</select>
@@ -503,7 +504,7 @@ function tkAttr(){const w=Math.min(120,Math.max(40,+S.printers.receiptW||80));re
 function ticketHtml(r){
   return `<div class="ticket" ${tkAttr()}>
   <div class="hd"><b>${esc(brandOf('servis'))}</b><br>${esc(S.company.sub)}</div><hr>
-  <div class="tn"><span>TALON</span><span class="bigno">№${r.talon}</span></div>
+  <div class="tn"><span>TALON</span><span class="bigno">№${tn(r.talon)}</span></div>
   <div class="kv"><span>${dS(r.ts)}</span><span>${tS(r.ts)}</span></div>
   ${code128Svg('T'+r.talon,30)}<hr>
   <div class="f"><span>Mijoz</span><span>${esc(r.name)}</span><span>Tel</span><span>${esc(r.phone)}</span>
@@ -515,7 +516,7 @@ function ticketHtml(r){
 }
 function showTalon(t){
   const r=S.repairs.find(x=>x.talon===t); if(!r) return;
-  modal(`<h3>Talon №${r.talon}</h3>${ticketHtml(r)}
+  modal(`<h3>Talon №${tn(r.talon)}</h3>${ticketHtml(r)}
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button>${printBtn('ticket')}</div>`);
 }
 
@@ -528,7 +529,7 @@ function vMijozlar(){
   <div class="tbl"><table><thead><tr><th>Ism</th><th>Telefon</th><th class="r">Remontlar</th><th>Oxirgi talon</th>${canCredit()?'<th class="r">Nasiya qarzi</th>':''}</tr></thead><tbody>
   ${list.map(c=>{const rs=S.repairs.filter(r=>r.phone===c.phone);const last=rs[rs.length-1];
     return `<tr><td>${esc(c.name)}</td><td class="num">${esc(c.phone)}</td><td class="r num">${rs.length}</td>
-    <td>${last?`<button class="sm" data-talon="${last.talon}">№${last.talon}</button> <span class="status s-${last.status}">${stName(last.status)}</span>`:'<span class="muted">—</span>'}</td>${canCredit()?(()=>{const o=clientDebt(c.phone);return `<td class="r num">${o?`<b style="color:var(--bad)">${fmt(o)}</b>`:'—'}</td>`;})():''}</tr>`}).join('')}
+    <td>${last?`<button class="sm" data-talon="${last.talon}">№${tn(last.talon)}</button> <span class="status s-${last.status}">${stName(last.status)}</span>`:'<span class="muted">—</span>'}</td>${canCredit()?(()=>{const o=clientDebt(c.phone);return `<td class="r num">${o?`<b style="color:var(--bad)">${fmt(o)}</b>`:'—'}</td>`;})():''}</tr>`}).join('')}
   </tbody></table></div></section>
   ${owner()?`<section class="panel"><h2>Daftardan mijozlarni ko'chirish</h2><form id="impClF" style="display:grid;gap:10px">
     <label>Har qatorga bitta mijoz: telefon; ism<textarea id="imp_txt" rows="6" placeholder="+998901234567; Akmal&#10;+998935551122; Dilnoza"></textarea></label>
@@ -638,7 +639,7 @@ function userBlock(u){
       <div class="stat"><div class="k">Shu oy topshirildi</div><div class="v">${doneMon.length}</div></div>
       <div class="stat"><div class="k">Shu oy ish summasi</div><div class="v">${fmt(doneMon.reduce((a,r)=>a+(+r.feeUzs||0),0))}</div></div></div></section>
     <section class="panel"><h2>Ishdagi qurilmalar</h2><div class="tbl"><table><thead><tr><th>Talon</th><th>Qurilma / muammo</th><th>Mijoz</th><th>Holati</th><th></th></tr></thead><tbody>
-    ${act.map(r=>`<tr><td class="talonno">№${r.talon}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div></td>
+    ${act.map(r=>`<tr><td class="talonno">№${tn(r.talon)}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div></td>
       <td>${esc(r.device)}${r.model?' · '+esc(r.model):''}<div class="small muted">${esc(r.problem)}</div></td>
       <td>${esc(r.name)}<div class="small muted num">${esc(r.phone)}</div></td>
       <td><select data-st="${r.talon}" style="width:auto;padding:4px 8px" aria-label="Holati">${STATUSES.map(s=>`<option value="${s[0]}" ${s[0]===r.status?'selected':''}>${s[1]}</option>`).join('')}</select></td>
@@ -1077,7 +1078,7 @@ async function refresh() {
     allRows(() => db.from('products').select('*').order('name')),
     must(db.from('product_costs').select('*')),
     allRows(() => db.from('clients').select('phone,name,tg_chat_id').order('created_at')),
-    allRows(() => db.from('repairs').select('*').or(`status.neq.berildi,created_at.gte.${since},done_at.gte.${since}`).order('talon')),
+    allRows(() => db.from('repairs').select('*').order('talon')),
     allRows(() => db.from('sales').select('*, sale_items(*, sale_item_costs(*))').gte('created_at', since).order('created_at')),
     allRows(() => db.from('expenses').select('*').gte('created_at', since).order('created_at')),
     db.rpc('payroll', { p_month: today().slice(0, 7) }),
@@ -1280,7 +1281,7 @@ document.addEventListener('submit', async (e) => {
     if (id === 'qabulF') {
       const r = await act(() => must(db.rpc('intake_repair', { p: {
         phone: v('r_phone').replace(/\s/g, ''), name: v('r_name'), device: v('r_dev'), model: v('r_model'), serial: v('r_serial'),
-        problem: v('r_prob'), accessories: v('r_acc'), fee_uzs: +v('r_fee') || 0, master_id: v('r_master') } })), (r) => `Talon №${r.talon} berildi`);
+        problem: v('r_prob'), accessories: v('r_acc'), fee_uzs: +v('r_fee') || 0, master_id: v('r_master') } })), (r) => `Talon №${tn(r.talon)} berildi`);
       showTalon(r.talon);
     }
     if (id === 'userF') {
@@ -1544,7 +1545,7 @@ document.addEventListener('click', async (e) => {
     if (b.id === 'repPrev') reportModal();
     if (b.dataset.stk) {
       const k = b.dataset.stk;
-      if (k[0] === 'r') { const r = S.repairs.find((x) => x.talon == k.slice(1)); stickerModal({ line: 'servis', ref: '№' + r.talon, war: warLoad('servis', 'servis'), from: r.doneTs || Date.now() }); }
+      if (k[0] === 'r') { const r = S.repairs.find((x) => x.talon == k.slice(1)); stickerModal({ line: 'servis', ref: '№' + tn(r.talon), war: warLoad('servis', 'servis'), from: r.doneTs || Date.now() }); }
       else { const p = S.products.find((x) => x.id === k.slice(1)); stickerModal({ line: p.line, war: warLoad(p.id, p.line), pid: p.id, name: p.name }); }
     }
     if (b.dataset.pedit) productEditModal(b.dataset.pedit);
