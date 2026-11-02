@@ -1200,7 +1200,10 @@ async function enter() {
   let prof = (await db.from('profiles').select('id,active').eq('id', session.user.id).maybeSingle()).data;
   if (!prof) { await db.rpc('claim_owner', { p_name: 'Rahbar' }); prof = (await db.from('profiles').select('id,active').eq('id', session.user.id).maybeSingle()).data; }
   if (!prof || !prof.active) { await db.auth.signOut(); return showLogin('Bu hisobga ruxsat berilmagan. Rahbarga murojaat qiling.'); }
-  try { await refresh(); } catch (e) { return showLogin('Bazadan o\'qib bo\'lmadi: ' + e.message); }
+  try { await refresh(); } catch (e) {
+    try { const { data } = await db.auth.refreshSession(); if (data?.session) await refresh(); else throw e; }
+    catch (e2) { return showLogin(/permission denied/i.test(e.message) ? 'Sessiya uzildi. Qaytadan kiring (qurilma soatini ham tekshiring).' : 'Bazadan o\'qib bo\'lmadi: ' + e.message); }
+  }
   document.getElementById('gate').hidden = true;
   if (!location.hash) tab = owner() ? 'xodimlar' : 'mening';
   route(); subscribe();
@@ -1209,7 +1212,15 @@ async function enter() {
 /* ---------- harakatlar ---------- */
 async function act(fn, okMsg) {
   try { const r = await fn(); await refresh(); keepScroll(render); if (okMsg) toast(typeof okMsg === 'function' ? okMsg(r) : okMsg); return r; }
-  catch (e) { toast(e?.message || String(e)); if (e && typeof e === 'object') e._shown = true; throw e; }
+  catch (e) {
+    // Sessiya uzilgan bo'lsa (masalan, qurilma soati tufayli) — bir marta yangilab ko'ramiz, bo'lmasa qayta kirishni so'raymiz
+    if (/permission denied|JWT|not authorized/i.test(e?.message || '') && !act._retry) {
+      const { data } = await db.auth.refreshSession().catch(() => ({ data: {} }));
+      if (data?.session) { act._retry = true; try { return await act(fn, okMsg); } finally { act._retry = false; } }
+      closeModal(); toast('Sessiya tugadi — qayta kiring'); return showLogin('Sessiya tugadi. Login va parolni qayta kiriting.');
+    }
+    toast(e?.message || String(e)); if (e && typeof e === 'object') e._shown = true; throw e;
+  }
 }
 async function adminUsers(body) {
   const { data, error } = await db.functions.invoke('admin-users', { body });
