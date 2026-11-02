@@ -5,9 +5,11 @@ import qrcode from 'qrcode-generator';
 const today=()=>new Date().toLocaleDateString('en-CA');
 const dayOf=ts=>new Date(ts).toLocaleDateString('en-CA');
 // Vaqt: Toshkent vaqti bo'yicha soat:minut:soniya
-const _tz={timeZone:'Asia/Tashkent'};
+const CLK={tz:'Asia/Tashkent',adj:0,sync:true,skew:0};
+const nowFix=()=>Date.now()+(CLK.sync?CLK.skew:0)+(+CLK.adj||0)*60000;
+const TZS=[['Asia/Tashkent','Toshkent (UTC+5)'],['Asia/Samarkand','Samarqand (UTC+5)'],['Europe/Moscow','Moskva (UTC+3)'],['Asia/Almaty','Olmaota (UTC+5)'],['Asia/Dubai','Dubay (UTC+4)'],['Europe/Istanbul','Istanbul (UTC+3)'],['UTC','UTC (Grinvich)']];
 const _p2=n=>String(n).padStart(2,'0');
-function _parts(ts){const f=new Intl.DateTimeFormat('en-GB',{..._tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(new Date(ts));const o={};f.forEach(x=>o[x.type]=x.value);if(o.hour==='24')o.hour='00';return o;}
+function _parts(ts){let tz=CLK.tz||'Asia/Tashkent'; let f; try{f=new Intl.DateTimeFormat('en-GB',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(new Date(ts));}catch{f=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Tashkent',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(new Date(ts));} const o={};f.forEach(x=>o[x.type]=x.value);if(o.hour==='24')o.hour='00';return o;}
 const tS=ts=>{if(!ts)return '';const o=_parts(ts);return `${o.hour}:${o.minute}:${o.second}`;};
 const dS=ts=>{if(!ts)return '';const o=_parts(ts);return `${o.day}.${o.month}.${o.year}`;};
 const dts=ts=>ts?`${dS(ts)} ${tS(ts)}`:'';
@@ -43,8 +45,10 @@ const canExp=()=>S.mods.expenses&&(owner()||me().canExpense);
 const canReturn=()=>S.mods.returns!==false&&(owner()||me().canReturn);
 const canCredit=()=>S.mods.credit!==false&&(owner()||me().canCredit);
 const canDisc=()=>owner()||(S.mods.discount!==false&&me().canDiscount);
-const discLim=line=>owner()?100:+(S.discount?.[line]||0);
-const minPrice=c=>Math.ceil(c.listUzs*(1-discLim(c.line)/100)/1000)*1000;
+const discRule=line=>{const r=S.discount?.[line]; return r==null?{type:'pct',v:0}:typeof r==='number'?{type:'pct',v:r}:{type:r.type||'pct',v:+r.v||0};};
+const discMax=(line,list)=>{if(owner()) return list; const r=discRule(line); return r.type==='uzs'?r.v:r.type==='usd'?r.v*S.rate:list*r.v/100;};
+const discLim=line=>{const r=discRule(line); return r.type==='uzs'?`${fmt(r.v)} so'm`:r.type==='usd'?usd(r.v):`${r.v}%`;};
+const minPrice=c=>owner()?0:Math.max(0,Math.ceil((c.listUzs-discMax(c.line,c.listUzs))/1000)*1000);
 const usdOfUzs=u=>u/S.rate;
 const usdP=p=>p.sellUzs?p.sellUzs/S.rate:p.sellUsd;
 const both=(uzs,usdv)=>`${fmt(uzs)} so'm <span class="muted">· ${usd(usdv==null?uzs/S.rate:usdv)}</span>`;
@@ -256,7 +260,7 @@ function header(){
   document.getElementById('pageDate').textContent=new Date().toLocaleDateString('uz-UZ',{weekday:'long',day:'numeric',month:'long'});
   let ck=document.getElementById('clockChip');
   if(!ck){ck=document.createElement('span');ck.id='clockChip';ck.className='chip num';ck.style.cssText='font-variant-numeric:tabular-nums;font-weight:700;letter-spacing:.5px';ck.title='Hozirgi vaqt (Toshkent)';chip.parentNode.insertBefore(ck,chip.parentNode.firstChild);
-    const tick=()=>{ck.textContent='🕒 '+tS(Date.now());}; tick(); setInterval(tick,1000);}
+    const tick=()=>{ck.textContent='🕒 '+tS(nowFix());}; tick(); setInterval(tick,1000);}
 }
 
 /* ---------- SOTUV ---------- */
@@ -276,7 +280,11 @@ function vSotuv(){
     ${cart.map((c,i)=>{const lp=c.listUzs||c.priceUzs, dsc=lp-c.priceUzs, pct=lp?dsc/lp*100:0;
       return `<tr><td>${esc(c.name)}<div class="small num">${both(c.priceUzs)}</div>
       ${dsc>0?`<div class="small"><s class="muted num">${fmt(lp)}</s> <span class="chip warn" style="font-size:11px;padding:1px 8px">−${pct.toFixed(1).replace('.0','')}% · −${fmt(dsc)} so'm</span></div>`:''}
-      ${canDisc()?`<div class="row" style="gap:6px;margin-top:4px;flex-wrap:nowrap"><input data-cp="${i}" type="number" step="1000" min="${minPrice({...c,listUzs:lp})}" max="${lp}" value="${c.priceUzs}" class="num" style="width:130px;padding:4px 8px" aria-label="Narx (so'm)" title="Narxni tushirish"><span class="small muted">${owner()?'chegarasiz':`eng kam: ${fmt(minPrice({...c,listUzs:lp}))} (−${discLim(c.line)}%)`}</span></div>`:''}</td>
+      ${canDisc()?`<div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap;align-items:center">
+        <span class="small muted">Chegirma</span><input data-cd="${i}" type="number" min="0" step="any" value="${c.dv||''}" placeholder="0" class="num" style="width:90px;padding:4px 8px" aria-label="Chegirma miqdori">
+        <select data-cu="${i}" style="width:auto;padding:4px 6px" aria-label="Chegirma birligi"><option value="pct" ${c.du==='pct'||!c.du?'selected':''}>%</option><option value="uzs" ${c.du==='uzs'?'selected':''}>so'm</option><option value="usd" ${c.du==='usd'?'selected':''}>$</option></select>
+        <span class="small muted">yoki narx</span><input data-cp="${i}" type="number" step="1000" min="${minPrice({...c,listUzs:lp})}" max="${lp}" value="${c.priceUzs}" class="num" style="width:120px;padding:4px 8px" aria-label="Narx (so'm)">
+        <span class="small muted" style="width:100%">${owner()?'Rahbar: chegarasiz':`Chegara: ${discLim(c.line)} · eng kam narx ${fmt(minPrice({...c,listUzs:lp}))} so'm`}</span></div>`:''}</td>
       <td class="r"><div class="row" style="justify-content:flex-end;flex-wrap:nowrap"><button class="sm ghost" data-q="${i}" data-d="-1">−</button><span class="num">${c.qty}</span><button class="sm ghost" data-q="${i}" data-d="1">+</button></div></td>
       <td class="r num">${fmt(c.priceUzs*c.qty)}</td><td><button class="sm ghost" data-rm="${i}" aria-label="O'chirish">✕</button></td></tr>`}).join('')}
     </tbody></table></div>`:`<p class="muted">Savat bo'sh. Tovarni skanerlang.</p>`}
@@ -526,8 +534,13 @@ function vSozlamalar(){
     <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" data-mod="discount" ${S.mods.discount!==false?'checked':''} style="width:auto"> Narx tushirib berish (chegirma)</label>
     <p class="small muted" style="margin:0">O'chirilgan modul hech kimga, xodimlarga ham ko'rinmaydi. Ma'lumotlar o'chmaydi.</p></div></section>
   <section class="panel"><h2>Narx tushirish chegarasi</h2><form id="discF" class="form">
-    ${Object.entries({noutbuk:'Noutbuklar',kompyuter:'Kompyuter / qismlar',servis:'Servis'}).map(([k,n])=>`<label>${n} (ko'pi bilan %)<input id="ds_${k}" type="number" min="0" max="100" step="0.5" value="${+(S.discount?.[k]??0)}" class="num"></label>`).join('')}
-    <div class="full row"><button class="pri">Saqlash</button><span class="small muted">Xodim savatda narxni shu foizdan ortiq tushira olmaydi (0 — umuman tushira olmaydi). Rahbar uchun chegara yo'q. Har bir xodimga ruxsat "Xodimlar" → "Ruxsatlar"da beriladi.</span></div></form></section>`:''}
+    ${Object.entries({noutbuk:'Noutbuklar',kompyuter:'Kompyuter / qismlar',servis:'Servis'}).map(([k,n])=>{const r=discRule(k); return `<label>${n} — 1 dona uchun ko'pi bilan<span class="row" style="flex-wrap:nowrap"><input id="ds_${k}" type="number" min="0" step="any" value="${r.v}" class="num" style="flex:1"><select id="dt_${k}" style="width:auto"><option value="pct" ${r.type==='pct'?'selected':''}>%</option><option value="uzs" ${r.type==='uzs'?'selected':''}>so'm</option><option value="usd" ${r.type==='usd'?'selected':''}>$</option></select></span></label>`;}).join('')}
+    <div class="full row"><button class="pri">Saqlash</button><span class="small muted">Xodim savatda narxni shu miqdordan ortiq tushira olmaydi: foizda, so'mda yoki dollarda (0 — umuman tushira olmaydi). Rahbar uchun chegara yo'q. Har bir xodimga ruxsat "Xodimlar" → "Ruxsatlar"da beriladi.</span></div></form></section>
+  <section class="panel"><h2>Soat sozlamasi</h2><form id="clkF" class="form">
+    <label>Vaqt mintaqasi<select id="ck_tz">${TZS.map(([k,n])=>`<option value="${k}" ${k===CLK.tz?'selected':''}>${n}</option>`).join('')}</select></label>
+    <label>Tuzatish (daqiqa, + oldinga / − orqaga)<span class="row" style="flex-wrap:nowrap"><button type="button" class="sm" data-ckadj="-60">−1 soat</button><button type="button" class="sm" data-ckadj="-1">−1</button><input id="ck_adj" type="number" step="1" value="${+CLK.adj||0}" class="num" style="width:90px"><button type="button" class="sm" data-ckadj="1">+1</button><button type="button" class="sm" data-ckadj="60">+1 soat</button></span></label>
+    <label class="full row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" id="ck_sync" ${CLK.sync?'checked':''} style="width:auto"> Server vaqti bilan moslash (telefon soati noto'g'ri bo'lsa ham to'g'ri ko'rsatadi)</label>
+    <div class="full row"><button class="pri">Saqlash</button><span class="small muted">Hozir: <b class="num" id="ckPrev">${dts(nowFix())}</b> · telefon soati bilan farq: <span class="num">${Math.round(CLK.skew/1000)}</span> soniya</span></div></form></section>`:''}
   ${owner()?`<section class="panel"><h2>Printerlar</h2><form id="prF" class="form">
     <label>Chek va talon printeri<input id="pr_r" value="${esc(S.printers.receipt)}"></label>
     <label>Chek qog'ozi eni (mm)<input id="pr_w" type="number" min="40" max="120" value="${esc(S.printers.receiptW)}" class="num" list="rwl"></label>
@@ -1058,6 +1071,7 @@ async function refresh() {
     returns: rets.map(mapReturn),
     credit: st.credit || { days: 30, limit: 0, remindDays: 3 },
     discount: st.discount || { noutbuk: 5, kompyuter: 5, servis: 10 },
+    clock: st.clock || { tz: 'Asia/Tashkent', adj: 0, sync: true },
     cdebts: cdebts.map((d) => ({ id: d.id, ts: ms(d.created_at), saleId: d.sale_id, phone: d.client_phone, name: d.client_name, amount: +d.amount_uzs, paid: +d.paid_uzs,
       due: d.due_date, note: d.note || '', userId: d.user_id, closed: d.closed })),
     cpays: cpays.map((p) => ({ id: p.id, debtId: p.debt_id, ts: ms(p.created_at), amount: +p.amount_uzs, pay: p.pay, note: p.note || '' })),
@@ -1066,7 +1080,14 @@ async function refresh() {
     month: monthR?.data || null,
     debtPays: dpays.map((x) => ({ id: x.id, debtId: x.debt_id, ts: ms(x.created_at), amount: +x.amount, note: x.note || '' })),
   };
+  Object.assign(CLK, { tz: S.clock.tz || 'Asia/Tashkent', adj: +S.clock.adj || 0, sync: S.clock.sync !== false });
+  if (!syncClock._t || Date.now() - syncClock._t > 10 * 60000) syncClock();
   applySkin();
+}
+async function syncClock() {
+  syncClock._t = Date.now();
+  try { const t0 = Date.now(); const { data, error } = await db.rpc('server_now'); const t1 = Date.now();
+    if (!error && data) CLK.skew = new Date(data).getTime() - (t0 + t1) / 2; } catch {}
 }
 
 /* ---------- jonli yangilanish: boshqa qurilmada o'zgarsa ---------- */
@@ -1266,8 +1287,11 @@ document.addEventListener('submit', async (e) => {
         await must(db.from('customer_debts').insert({ user_id: S.cur, client_phone: ph, client_name: nm, amount_uzs: +v('od_sum'), due_date: v('od_due') || null, note: v('od_note') }));
       }, 'Eski qarz kiritildi');
     }
+    if (id === 'clkF') {
+      await act(() => settingsUpd({ clock: { tz: v('ck_tz'), adj: Math.round(+v('ck_adj') || 0), sync: document.getElementById('ck_sync').checked } }), 'Soat sozlamasi saqlandi');
+    }
     if (id === 'discF') {
-      const d = {}; for (const k of ['noutbuk', 'kompyuter', 'servis']) d[k] = Math.min(100, Math.max(0, +v('ds_' + k) || 0));
+      const d = {}; for (const k of ['noutbuk', 'kompyuter', 'servis']) { const tp = v('dt_' + k), val = Math.max(0, +v('ds_' + k) || 0); d[k] = { type: tp, v: tp === 'pct' ? Math.min(100, val) : val }; }
       await act(() => settingsUpd({ discount: d }), 'Narx tushirish chegarasi saqlandi');
     }
     if (id === 'credSetF') {
@@ -1337,11 +1361,18 @@ document.addEventListener('change', async (e) => {
     if (t.id === 'nFilter') { nFilter = t.value; render(); }
     if (t.id === 'salMon') { salMon = t.value; keepScroll(render); }
     if (t.id === 'k_cur') setKCur(t.value);
-    if (t.dataset.cp != null) {
-      const c = cart[+t.dataset.cp]; if (!c) return;
-      const lp = c.listUzs || c.priceUzs, mn = minPrice({ ...c, listUzs: lp }); let val = Math.round(+t.value || 0);
+    if (t.id === 'ck_tz' || t.id === 'ck_adj' || t.id === 'ck_sync') { CLK.tz = document.getElementById('ck_tz').value; CLK.adj = +document.getElementById('ck_adj').value || 0; CLK.sync = document.getElementById('ck_sync').checked; const pv = document.getElementById('ckPrev'); if (pv) pv.textContent = dts(nowFix()); }
+    if (t.dataset.cp != null || t.dataset.cd != null || t.dataset.cu != null) {
+      const i = +(t.dataset.cp ?? t.dataset.cd ?? t.dataset.cu), c = cart[i]; if (!c) return;
+      const lp = c.listUzs || c.priceUzs, mn = minPrice({ ...c, listUzs: lp }); let val;
+      if (t.dataset.cp != null) { val = Math.round(+t.value || 0); c.dv = ''; }
+      else {
+        c.du = document.querySelector(`[data-cu="${i}"]`).value; c.dv = document.querySelector(`[data-cd="${i}"]`).value;
+        const dv = +c.dv || 0, amt = c.du === 'uzs' ? dv : c.du === 'usd' ? dv * S.rate : lp * dv / 100;
+        val = Math.round((lp - amt) / 100) * 100;
+      }
       if (val > lp) { val = lp; toast("Asl narxdan yuqori qo'yib bo'lmaydi"); }
-      if (val < mn) { val = mn; toast(`Ko'pi bilan ${discLim(c.line)}% tushirish mumkin — eng kam narx ${fmt(mn)} so'm`); }
+      if (val < mn) { val = mn; c.dv = ''; toast(`Chegara: ko'pi bilan ${discLim(c.line)} — eng kam narx ${fmt(mn)} so'm`); }
       c.priceUzs = val; render();
     }
     if (t.id === 'pay') { payMode = t.value; render(); }
@@ -1422,6 +1453,7 @@ document.addEventListener('click', async (e) => {
       if (k[0] === 'r') { const r = S.repairs.find((x) => x.talon == k.slice(1)); stickerModal({ line: 'servis', ref: '№' + r.talon, war: warLoad('servis', 'servis'), from: r.doneTs || Date.now() }); }
       else { const p = S.products.find((x) => x.id === k.slice(1)); stickerModal({ line: p.line, war: warLoad(p.id, p.line), pid: p.id, name: p.name }); }
     }
+    if (b.dataset.ckadj) { const i = document.getElementById('ck_adj'); i.value = (+i.value || 0) + (+b.dataset.ckadj); CLK.adj = +i.value; const pv = document.getElementById('ckPrev'); if (pv) pv.textContent = dts(nowFix()); }
     if (b.dataset.war) {
       const pre = b.dataset.war, n = document.getElementById(pre + '_wn'), u = document.getElementById(pre + '_wu');
       if (n && u) { n.value = b.dataset.wn; u.value = b.dataset.wu; if (pre === 'lb') drawLabels(); else { drawStickers(); if (stkCtx.pid) warSave(stkCtx.pid, n.value, u.value); else if (stkCtx.line === 'servis') warSave('servis', n.value, u.value); } }
