@@ -178,10 +178,9 @@ td.talonno{border-left:3px solid var(--accent)}
 .label[data-size="58x30"]{width:58mm;height:30mm;font-size:10.5px}
 .label[data-size="40x30"]{width:40mm;height:30mm;font-size:9px}
 .label .lt{display:flex;justify-content:space-between;align-items:baseline;gap:4px;font-weight:800;font-size:1.05em;border-bottom:1.5px solid #000;padding-bottom:1px}
-.label .ln{font-family:var(--sans);font-weight:700;font-size:1.15em;line-height:1.12;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.label .ln{font-family:var(--sans);font-weight:700;font-size:1.15em;line-height:1.1;overflow-wrap:anywhere}
 .label .bc{height:var(--bch,8.5mm);margin:0}
 .label .lp{font-size:1.7em;font-weight:800;line-height:1}
-.label:has(.lp) .ln{-webkit-line-clamp:1}
 .label:has(.lp) .bc{height:calc(var(--bch,8.5mm)*.8)}
 .label .bn{text-align:center;letter-spacing:.1em;line-height:1;font-weight:600}
 .label .lf{display:grid;gap:0;font-size:.98em;line-height:1.2;border-top:1.5px solid #000;padding-top:1px;white-space:nowrap;overflow:hidden}
@@ -190,7 +189,7 @@ td.talonno{border-left:3px solid var(--accent)}
 .stk[data-size="58x40"]{width:58mm;height:40mm;font-size:11px}
 .stk[data-size="50x30"]{width:50mm;height:30mm;font-size:8.5px}
 .stk[data-size="40x30"]{width:40mm;height:30mm;font-size:7.5px}
-.stk .sb{font-family:var(--sans);font-weight:800;font-size:1.7em;line-height:.95;letter-spacing:.01em}
+.stk .sb{font-family:var(--sans);font-weight:800;font-size:1.7em;line-height:1.05;letter-spacing:.01em;white-space:nowrap;overflow:hidden}
 .stk .ss{font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:.8em;margin-top:.4mm}
 .stk .sp{font-family:var(--mono);font-weight:800;font-size:1.3em;margin-top:1mm}
 .stk .so{font-family:var(--mono);font-weight:600;line-height:1.25}
@@ -198,6 +197,7 @@ td.talonno{border-left:3px solid var(--accent)}
 .stk .qr svg{width:100%;height:100%;display:block}
 .stk .sf{grid-column:1/-1;display:flex;justify-content:space-between;gap:4px;border-top:1px dashed #000;padding-top:.8mm;font-family:var(--mono);font-weight:700;font-size:.9em;white-space:nowrap;align-self:end}
 .stk.noqr{grid-template-columns:minmax(0,1fr)}
+.stk .sn{grid-column:1/-1;font-family:var(--sans);font-weight:700;line-height:1.1;overflow-wrap:anywhere;border-top:1px solid #000;padding-top:.6mm}
 .labels-sheet{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:14px;background:var(--sunk);border-radius:10px;max-height:46vh;overflow:auto}
 @media (max-width:980px){.grid2{grid-template-columns:minmax(0,1fr)}}
 /* phone: rail becomes a bottom dock */
@@ -228,7 +228,7 @@ body{margin:0}
 </style>
 
 
-  <script type="module" crossorigin src="./assets/index-DtAwBZGX.js"></script>
+  <script type="module" crossorigin src="./assets/index-C4PXAll2.js"></script>
 </head>
 <body>
 <div class="app">

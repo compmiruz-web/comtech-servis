@@ -79,22 +79,43 @@ function sizeFields(pre,w,h){return `<label>O'lchami<select id="${pre}_size">${s
 function readSize(pre,fromSel){const g=x=>document.getElementById(pre+'_'+x);
   const sel=g('size').value; if(sel!=='custom'&&fromSel){const [w,h]=dims(sel);g('w').value=w;g('h').value=h;}
   const [w,h]=dims(g('w').value+'x'+g('h').value); const m=w+'x'+h; if(PRESETS.includes(m)) g('size').value=m; else g('size').value='custom'; return m;}
-function labelHtml(p,size,price){const c=lineOf(p.line);
+// Kafolat: istalgan muddat (kun / oy / yil)
+const WAR_U={kun:'kun',oy:'oy',yil:'yil'};
+const warText=(n,u)=>+n>0?`${+n} ${WAR_U[u]||'oy'}`:'';
+function warUntil(from,n,u){const d=new Date(from||Date.now()); if(u==='kun') d.setDate(d.getDate()+(+n)); else if(u==='yil') d.setFullYear(d.getFullYear()+(+n)); else d.setMonth(d.getMonth()+(+n)); return dS(d);}
+function warDefault(line){return line==='noutbuk'||line==='kompyuter'?{n:12,u:'oy'}:line==='servis'?{n:1,u:'oy'}:{n:0,u:'oy'};}
+function warLoad(key,line){try{const x=JSON.parse(localStorage.getItem('comtech_war_'+key)||'null'); if(x) return x;}catch{} return warDefault(line);}
+function warSave(key,n,u){try{localStorage.setItem('comtech_war_'+key,JSON.stringify({n:+n||0,u}));}catch{}}
+function warFields(pre,w,withFrom,from){
+  return `<label>Kafolat muddati<span class="row" style="flex-wrap:nowrap"><input id="${pre}_wn" type="number" min="0" max="999" value="${+w.n||0}" class="num" style="width:90px" title="0 — kafolatsiz"><select id="${pre}_wu" style="width:auto">${Object.keys(WAR_U).map(k=>`<option value="${k}" ${k===w.u?'selected':''}>${WAR_U[k]}</option>`).join('')}</select></span></label>
+  <div class="full row" style="gap:6px">${[[0,'oy','Yo\'q'],[15,'kun','15 kun'],[1,'oy','1 oy'],[3,'oy','3 oy'],[6,'oy','6 oy'],[12,'oy','12 oy'],[2,'yil','2 yil'],[3,'yil','3 yil']].map(([n,u,t])=>`<button type="button" class="sm" data-war="${pre}" data-wn="${n}" data-wu="${u}">${t}</button>`).join('')}</div>
+  ${withFrom?`<label>Kafolat boshlanishi<input id="${pre}_wf" type="date" value="${new Date(from||Date.now()).toLocaleDateString('en-CA')}"></label>`:''}`;
+}
+function labelHtml(p,size,price,war){const c=lineOf(p.line); const wt=war?warText(war.n,war.u):'';
   const [w,h]=dims(size), fs=Math.max(6.5,Math.min(w*.215,h*.31)).toFixed(1);
   return `<div class="label" style="width:${w}mm;height:${h}mm;font-size:${fs}px;--bch:${(h*.21).toFixed(1)}mm"><div class="lt"><span>${esc(brandOf(p.line))}</span><span>${esc(c.phone)}</span></div>
-  <div class="ln">${esc(p.name)}</div>${price?`<div class="lp">${fmt(priceUzs(p))} <span style="font-size:.5em">so'm</span></div>`:''}
+  <div class="ln">${esc(p.name).replace(/\|/g,'|<wbr>')}</div>${price?`<div class="lp">${fmt(priceUzs(p))} <span style="font-size:.5em">so'm</span></div>`:''}${wt?`<div style="font-weight:800;font-size:.95em">KAFOLAT: ${esc(wt.toUpperCase())}</div>`:''}
   <div>${code128Svg(p.barcode,40)}<div class="bn">${esc(p.barcode)}</div></div>
-  <div class="lf">${c.telegram?`<div><b>Telegram</b> ${esc(c.telegram)}</div>`:''}${c.instagram?`<div><b>Instagram</b> ${esc(c.instagram)}</div>`:''}</div></div>`;}
+  ${war&&war.noct?'':`<div class="lf">${c.telegram?`<div><b>Telegram</b> ${esc(c.telegram)}</div>`:''}${c.instagram?`<div><b>Instagram</b> ${esc(c.instagram)}</div>`:''}</div>`}</div>`;}
+// Matn yorliqqa sig'maguncha shriftni kichraytiradi (to'liq parametrlar ko'rinsin)
+function fitBox(box, el, min = 4.5) {
+  if (!box || !el) return;
+  let fs = parseFloat(getComputedStyle(el).fontSize) || 12, i = 0;
+  while (box.scrollHeight > box.clientHeight + 1 && fs > min && i++ < 120) { fs -= 0.25; el.style.fontSize = fs + 'px'; }
+}
 function labelModal(id){
   const p=S.products.find(x=>x.id===id); if(!p.barcode){toast('Avval shtrix-kod kiriting');return;}
   const size=S.printers.labelW+'x'+S.printers.labelH; const [lw,lh]=dims(size);
   modal(`<h3>Etiketka: ${esc(p.name)}</h3>
   <div class="form">${sizeFields('lb',lw,lh)}
   <label>Nechta<input id="lb_n" type="number" min="1" max="200" value="${Math.max(1,p.qty)}" class="num"></label>
-  <label class="full row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" id="lb_price" ${S.company.labelPrice?'checked':''} style="width:auto"> Narxni ko'rsatish</label></div>
-  <div class="labels-sheet" id="lbSheet" data-p="${p.id}">${labelHtml(p,size,S.company.labelPrice)}</div>
+  ${warFields('lb',warLoad(p.id,p.line))}
+  <label class="full row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" id="lb_price" ${S.company.labelPrice?'checked':''} style="width:auto"> Narxni ko'rsatish</label>
+  <label class="full row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" id="lb_noct" ${p.name.length>45?'checked':''} style="width:auto"> Telegram/Instagram'ni yashirish (uzun parametrlarga joy)</label></div>
+  <div class="labels-sheet" id="lbSheet" data-p="${p.id}"></div>
   <p class="small muted" style="margin:0">Printer: ${esc(S.printers.label)}. Narx qo'yilsa, u bugungi kurs bo'yicha bo'ladi.</p>
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button>${printBtn('labels')}</div>`);
+  drawLabels();
 }
 const PAYN={naqd:'Naqd',karta:'Karta',otkazma:"O'tkazma",nasiya:'Nasiya'};
 function receiptModal(sale){const c=S.company; const bl=sale.items[0]?.line||'kompyuter', bn=brandOf(bl);
@@ -115,12 +136,13 @@ const tgUrl=h=>h?'https://t.me/'+h.replace(/^@/,''):'';
 function qrSvg(text){try{const q=qrcode(0,'M');q.addData(text);q.make();return q.createSvgTag({cellSize:2,margin:0,scalable:true});}catch(e){return '';}}
 const STK_TITLE={servis:'Servis xizmati',noutbuk:'Noutbuklar',kompyuter:'Kompyuterlar'};
 function stickerHtml(o){const c=lineOf(o.line); const q=o.qr&&c.telegram?qrSvg(tgUrl(c.telegram)):'';
-  let till='';if(+o.warranty){const d=new Date(o.from||Date.now());d.setMonth(d.getMonth()+(+o.warranty));till=d.toLocaleDateString('uz');}
+  const till=+o.wn>0?warUntil(o.from,o.wn,o.wu):'';
   const [w,h]=dims(o.size), fs=Math.max(6,Math.min(w*.19,h*.275)).toFixed(1);
   return `<div class="stk ${q?'':'noqr'}" style="width:${w}mm;height:${h}mm;font-size:${fs}px;--qr:${Math.min(h*.36,w*.25).toFixed(1)}mm">
   <div><div class="sb">${esc(brandOf(o.line))}</div><div class="ss">${brandOf(o.line)!==S.company.name?esc(S.company.name):(STK_TITLE[o.line]||'')}</div>
   <div class="sp">${esc(c.phone)}</div><div class="so">${c.telegram?'TG '+esc(c.telegram):''}<br>${c.instagram?'IG '+esc(c.instagram):''}</div></div>
   ${q?`<div class="qr">${q}</div>`:''}
+  ${o.name?`<div class="sn">${esc(o.name).replace(/\|/g,'|<wbr>')}</div>`:''}
   <div class="sf"><span>${till?'Kafolat: '+till+' gacha':'Servis uchun murojaat qiling'}</span><span>${o.ref?esc(o.ref):''}</span></div></div>`;}
 let stkCtx={};
 function stickerModal(ctx){stkCtx=ctx;
@@ -128,17 +150,18 @@ function stickerModal(ctx){stkCtx=ctx;
   <div class="form">
     <label>Yo'nalish<select id="sk_line">${Object.keys(STK_TITLE).map(k=>`<option value="${k}" ${k===ctx.line?'selected':''}>${STK_TITLE[k]}</option>`).join('')}</select></label>
     ${sizeFields('sk',S.printers.stkW,S.printers.stkH)}
-    <label>Kafolat<select id="sk_war"><option value="0">Yo'q</option><option value="1">1 oy</option><option value="3">3 oy</option><option value="6">6 oy</option><option value="12">12 oy</option></select></label>
+    ${warFields('sk',ctx.war||warDefault(ctx.line),true,ctx.from)}
     <label>Nechta<input id="sk_n" type="number" min="1" max="100" value="1" class="num"></label>
+    ${ctx.name?`<label class="full row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" id="sk_pname" checked style="width:auto"> Tovar parametrlarini chiqarish</label>`:''}
     <label class="full row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" id="sk_qr" checked style="width:auto"> Telegram QR kod</label>
   </div>
   <div class="labels-sheet" id="skSheet"></div>
   <p class="small muted" style="margin:0">QR kod skanerlansa, tanlangan yo'nalishning Telegram sahifasi ochiladi. Printer: ${esc(S.printers.label)}.</p>
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button>${printBtn('stickers')}</div>`);
-  document.getElementById('sk_war').value=ctx.warranty||'0'; drawStickers();}
+  drawStickers();}
 function drawStickers(fromSel){const g=id=>document.getElementById(id); if(!g('skSheet')) return;
-  const o={line:g('sk_line').value,size:readSize('sk',fromSel),warranty:g('sk_war').value,qr:g('sk_qr').checked,ref:stkCtx.ref,from:stkCtx.from};
-  const n=Math.min(100,Math.max(1,+g('sk_n').value||1)); g('skSheet').innerHTML=Array(Math.min(n,12)).fill(stickerHtml(o)).join('')+(n>12?`<p class="small muted" style="width:100%;text-align:center;margin:0">… jami ${n} ta</p>`:'');}
+  const o={line:g('sk_line').value,size:readSize('sk',fromSel),wn:+g('sk_wn').value||0,wu:g('sk_wu').value,qr:g('sk_qr').checked,name:g('sk_pname')?.checked?stkCtx.name:'',ref:stkCtx.ref,from:g('sk_wf')?.value?new Date(g('sk_wf').value+'T12:00:00').getTime():stkCtx.from};
+  const n=Math.min(100,Math.max(1,+g('sk_n').value||1)); const sh=g('skSheet'); sh.innerHTML=stickerHtml(o); { const sb=sh.querySelector('.sb'); let f=parseFloat(getComputedStyle(sb).fontSize)||14, i=0; while(sb.scrollWidth>sb.clientWidth+1&&f>5&&i++<80){f-=0.25; sb.style.fontSize=f+'px';} } fitBox(sh.firstElementChild, sh.querySelector('.sn')); const one=sh.firstElementChild.outerHTML; sh.innerHTML=Array(Math.min(n,12)).fill(one).join('')+(n>12?`<p class="small muted" style="width:100%;text-align:center;margin:0">… jami ${n} ta</p>`:'');}
 function dayReport(d){
   const ss=S.sales.filter(s=>dayOf(s.ts)===d), ex=S.mods.expenses?S.expenses.filter(e=>dayOf(e.ts)===d):[];
   const rp=S.repairs.filter(r=>r.status==='berildi'&&r.doneTs&&dayOf(r.doneTs)===d), rin=S.repairs.filter(r=>dayOf(r.ts)===d);
@@ -1286,8 +1309,8 @@ document.addEventListener('change', async (e) => {
     if (t.id === 'saleDate') { saleDate = t.value && t.value <= today() ? t.value : today(); render(); }
     if (t.id === 'histDay') { const d = t.value && t.value <= today() ? t.value : today(); await loadDay(d); histDay = d; render(); }
     if (t.id === 'rt_item') { const o = t.selectedOptions[0]; const q = document.getElementById('rt_qty'); q.max = o.dataset.left; if (+q.value > +o.dataset.left) q.value = o.dataset.left; }
-    if (t.id && t.id.startsWith('sk_')) drawStickers(t.id === 'sk_size');
-    if (['lb_size', 'lb_w', 'lb_h', 'lb_n', 'lb_price'].includes(t.id)) drawLabels(t.id === 'lb_size');
+    if (t.id && t.id.startsWith('sk_')) { drawStickers(t.id === 'sk_size'); if (t.id === 'sk_wn' || t.id === 'sk_wu') { const n = document.getElementById('sk_wn').value, u = document.getElementById('sk_wu').value; if (stkCtx.pid) warSave(stkCtx.pid, n, u); else if (stkCtx.line === 'servis') warSave('servis', n, u); } }
+    if (['lb_size', 'lb_w', 'lb_h', 'lb_n', 'lb_price', 'lb_wn', 'lb_wu', 'lb_noct'].includes(t.id)) drawLabels(t.id === 'lb_size');
     if (t.dataset.perm) {
       const col = { canExpense: 'can_expense', seeSalary: 'see_salary', canDebt: 'can_debt', canReturn: 'can_return', canCredit: 'can_credit', canStock: 'can_stock' }[t.dataset.perm];
       await act(() => must(db.from('profiles').update({ [col]: t.checked }).eq('id', t.dataset.u)), t.checked ? 'Ruxsat yoqildi' : "Ruxsat o'chirildi");
@@ -1306,7 +1329,12 @@ function drawLabels(fromSel) {
   const sh = document.getElementById('lbSheet'); if (!sh) return;
   const pr = S.products.find((x) => x.id === sh.dataset.p);
   const n = Math.min(200, Math.max(1, +document.getElementById('lb_n').value || 1));
-  sh.innerHTML = Array(Math.min(n, 24)).fill(labelHtml(pr, readSize('lb', fromSel), document.getElementById('lb_price').checked)).join('') +
+  const war = { n: +document.getElementById('lb_wn')?.value || 0, u: document.getElementById('lb_wu')?.value || 'oy', noct: !!document.getElementById('lb_noct')?.checked };
+  warSave(pr.id, war.n, war.u);
+  sh.innerHTML = labelHtml(pr, readSize('lb', fromSel), document.getElementById('lb_price').checked, war);
+  fitBox(sh.firstElementChild, sh.querySelector('.ln'));
+  const one = sh.firstElementChild.outerHTML;
+  sh.innerHTML = Array(Math.min(n, 24)).fill(one).join('') +
     (n > 24 ? `<p class="small muted" style="width:100%;text-align:center;margin:0">… jami ${n} ta</p>` : '');
 }
 
@@ -1351,8 +1379,12 @@ document.addEventListener('click', async (e) => {
     if (b.id === 'repPrev') reportModal();
     if (b.dataset.stk) {
       const k = b.dataset.stk;
-      if (k[0] === 'r') { const r = S.repairs.find((x) => x.talon == k.slice(1)); stickerModal({ line: 'servis', ref: '№' + r.talon, warranty: '1', from: r.doneTs || Date.now() }); }
-      else { const p = S.products.find((x) => x.id === k.slice(1)); stickerModal({ line: p.line, warranty: p.line === 'noutbuk' || p.line === 'kompyuter' ? '12' : '0' }); }
+      if (k[0] === 'r') { const r = S.repairs.find((x) => x.talon == k.slice(1)); stickerModal({ line: 'servis', ref: '№' + r.talon, war: warLoad('servis', 'servis'), from: r.doneTs || Date.now() }); }
+      else { const p = S.products.find((x) => x.id === k.slice(1)); stickerModal({ line: p.line, war: warLoad(p.id, p.line), pid: p.id, name: p.name }); }
+    }
+    if (b.dataset.war) {
+      const pre = b.dataset.war, n = document.getElementById(pre + '_wn'), u = document.getElementById(pre + '_wu');
+      if (n && u) { n.value = b.dataset.wn; u.value = b.dataset.wu; if (pre === 'lb') drawLabels(); else { drawStickers(); if (stkCtx.pid) warSave(stkCtx.pid, n.value, u.value); else if (stkCtx.line === 'servis') warSave('servis', n.value, u.value); } }
     }
     if (b.dataset.genbar) { const el = document.getElementById(b.dataset.genbar); if (el) { el.value = genBarcode(); el.dispatchEvent(new Event('input', { bubbles: true })); document.getElementById('d_name')?.focus(); } }
     if (b.id === 'genBar') { document.getElementById('k_bar').value = genBarcode(); document.getElementById('k_name').focus(); }
