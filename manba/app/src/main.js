@@ -2,8 +2,13 @@ import { createClient } from '@supabase/supabase-js';
 import qrcode from 'qrcode-generator';
 
 
-const today=()=>new Date().toLocaleDateString('en-CA');
-const dayOf=ts=>new Date(ts).toLocaleDateString('en-CA');
+// Barcha sanalar O'zbekiston (Toshkent) vaqti bo'yicha — qurilma soati/mintaqasi qanday bo'lishidan qat'i nazar
+const _ymdF=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tashkent',year:'numeric',month:'2-digit',day:'2-digit'});
+const ymdUz=ts=>_ymdF.format(new Date(ts));
+const today=()=>ymdUz(Date.now());
+const dayOf=ts=>ymdUz(ts);
+// Toshkent vaqtidagi sana+vaqt (YYYY-MM-DD, HH:MM[:SS]) -> haqiqiy vaqt (Toshkent doim UTC+5, yozgi vaqt yo'q)
+const uzToDate=(d,t)=>new Date(`${d}T${(t||'12:00').length===5?(t||'12:00')+':00':t}+05:00`);
 // Vaqt: Toshkent vaqti bo'yicha soat:minut:soniya
 const CLK={tz:'Asia/Tashkent',adj:0,sync:true,skew:0};
 const nowFix=()=>Date.now()+(CLK.sync?CLK.skew:0)+(+CLK.adj||0)*60000;
@@ -99,7 +104,7 @@ function warSave(key,n,u){try{localStorage.setItem('comtech_war_'+key,JSON.strin
 function warFields(pre,w,withFrom,from){
   return `<label>Kafolat muddati<span class="row" style="flex-wrap:nowrap"><input id="${pre}_wn" type="number" min="0" max="999" value="${+w.n||0}" class="num" style="width:90px" title="0 — kafolatsiz"><select id="${pre}_wu" style="width:auto">${Object.keys(WAR_U).map(k=>`<option value="${k}" ${k===w.u?'selected':''}>${WAR_U[k]}</option>`).join('')}</select></span></label>
   <div class="full row" style="gap:6px">${[[0,'oy','Yo\'q'],[15,'kun','15 kun'],[1,'oy','1 oy'],[3,'oy','3 oy'],[6,'oy','6 oy'],[12,'oy','12 oy'],[2,'yil','2 yil'],[3,'yil','3 yil']].map(([n,u,t])=>`<button type="button" class="sm" data-war="${pre}" data-wn="${n}" data-wu="${u}">${t}</button>`).join('')}</div>
-  ${withFrom?`<label>Kafolat boshlanishi<input id="${pre}_wf" type="date" value="${new Date(from||Date.now()).toLocaleDateString('en-CA')}"></label>`:''}`;
+  ${withFrom?`<label>Kafolat boshlanishi<input id="${pre}_wf" type="date" value="${ymdUz(from||Date.now())}"></label>`:''}`;
 }
 function labelHtml(p,size,price,war){const c=lineOf(p.line); const wt=war?warText(war.n,war.u):'';
   const [w,h]=dims(size), fs=Math.max(6.5,Math.min(w*.215,h*.31)).toFixed(1);
@@ -171,7 +176,7 @@ function stickerModal(ctx){stkCtx=ctx;
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button>${printBtn('stickers')}</div>`);
   drawStickers();}
 function drawStickers(fromSel){const g=id=>document.getElementById(id); if(!g('skSheet')) return;
-  const o={line:g('sk_line').value,size:readSize('sk',fromSel),wn:+g('sk_wn').value||0,wu:g('sk_wu').value,qr:g('sk_qr').checked,name:g('sk_pname')?.checked?stkCtx.name:'',ref:stkCtx.ref,from:g('sk_wf')?.value?new Date(g('sk_wf').value+'T12:00:00').getTime():stkCtx.from};
+  const o={line:g('sk_line').value,size:readSize('sk',fromSel),wn:+g('sk_wn').value||0,wu:g('sk_wu').value,qr:g('sk_qr').checked,name:g('sk_pname')?.checked?stkCtx.name:'',ref:stkCtx.ref,from:g('sk_wf')?.value?uzToDate(g('sk_wf').value,'12:00').getTime():stkCtx.from};
   const n=Math.min(100,Math.max(1,+g('sk_n').value||1)); const sh=g('skSheet'); sh.innerHTML=stickerHtml(o); { const sb=sh.querySelector('.sb'); let f=parseFloat(getComputedStyle(sb).fontSize)||14, i=0; while(sb.scrollWidth>sb.clientWidth+1&&f>5&&i++<80){f-=0.25; sb.style.fontSize=f+'px';} } fitBox(sh.firstElementChild, sh.querySelector('.sn')); const one=sh.firstElementChild.outerHTML; sh.innerHTML=Array(Math.min(n,12)).fill(one).join('')+(n>12?`<p class="small muted" style="width:100%;text-align:center;margin:0">… jami ${n} ta</p>`:'');}
 function dayReport(d){
   const ss=S.sales.filter(s=>dayOf(s.ts)===d), ex=S.mods.expenses?S.expenses.filter(e=>dayOf(e.ts)===d):[];
@@ -430,10 +435,10 @@ function productEditModal(id){
 }
 function saleEditModal(id){
   const sl=[...S.sales, ...Object.values(extraSales).flat()].find(x=>x.id===id); if(!sl) return;
-  const loc=new Date(sl.ts), pad=n=>String(n).padStart(2,'0');
+  const pad=n=>String(n).padStart(2,'0');
   modal(`<h3>Sotuv №${sl.no||''}ni tahrirlash</h3>
     <form id="seditF" data-s="${sl.id}" style="display:grid;gap:10px">
-      <div class="row" style="flex-wrap:nowrap;gap:10px"><label style="flex:1">Sana<input id="se_d" type="date" value="${loc.toLocaleDateString('en-CA')}"></label><label style="flex:1">Vaqt<input id="se_t" type="time" step="1" value="${pad(loc.getHours())}:${pad(loc.getMinutes())}:${pad(loc.getSeconds())}"></label></div>
+      <div class="row" style="flex-wrap:nowrap;gap:10px"><label style="flex:1">Sana<input id="se_d" type="date" value="${ymdUz(sl.ts)}"></label><label style="flex:1">Vaqt<input id="se_t" type="time" step="1" value="${tS(sl.ts)}"></label></div>
       <label>To'lov turi<select id="se_pay" ${sl.pay==='nasiya'?'disabled':''}>${['naqd','karta','otkazma'].concat(sl.pay==='nasiya'?['nasiya']:[]).map(k=>`<option value="${k}" ${k===sl.pay?'selected':''}>${PAYN[k]}</option>`).join('')}</select></label>
       <div class="row" style="justify-content:flex-end"><button class="pri">Sana / to'lovni saqlash</button></div></form>
     <hr>
@@ -522,7 +527,7 @@ function vMijozlar(){
 /* ---------- HISOBOT ---------- */
 function vHisobot(){
   if(!owner()) return `<section class="panel"><div class="lock">Bu bo'lim faqat rahbar uchun.</div></section>`;
-  const days=[...Array(7)].map((_,i)=>{const d=new Date(Date.now()-i*86400000).toLocaleDateString('en-CA');
+  const days=[...Array(7)].map((_,i)=>{const d=ymdUz(Date.now()-i*86400000);
     const ss=S.sales.filter(s=>dayOf(s.ts)===d), rr=S.returns.filter(r=>dayOf(r.ts)===d);
     const back=rr.reduce((a,r)=>a+r.refund,0), backCost=rr.reduce((a,r)=>a+r.costUzs,0);
     const rev=ss.reduce((a,s)=>a+s.totalUzs,0)-back, prof=ss.reduce((a,s)=>a+saleProfit(s),0)-(back-backCost);
@@ -878,11 +883,10 @@ function salaryHistory(uid){
 }
 function salPayModal(id){
   const u=S.users.find(x=>x.id===id), p=payroll(u);
-  const now=new Date(), pad=n=>String(n).padStart(2,'0');
   modal(`<h3>${esc(u.name)}ga oylik berish</h3><form id="salF" data-u="${u.id}" style="display:grid;gap:10px">
   <p class="small muted" style="margin:0">Shu oy hisoblangan: ${fmt(p.total)} · berilgan: ${fmt(p.paid)} · qoldiq: <b>${fmt(p.left)}</b> so'm</p>
   <label>Summa (so'm)<input id="sp_sum" type="number" min="1" step="1000" required value="${p.left>0?p.left:''}" class="num" style="font-size:20px"></label>
-  <div class="row" style="flex-wrap:nowrap"><label style="flex:1">Sana<input id="sp_date" type="date" required value="${today()}"></label><label style="flex:1">Vaqt<input id="sp_time" type="time" required value="${pad(now.getHours())}:${pad(now.getMinutes())}"></label></div>
+  <div class="row" style="flex-wrap:nowrap"><label style="flex:1">Sana<input id="sp_date" type="date" required value="${today()}"></label><label style="flex:1">Vaqt<input id="sp_time" type="time" required value="${tS(Date.now()).slice(0,5)}"></label></div>
   <label>Turi<select id="sp_note"><option>Oylik</option><option>Avans</option><option>Bonus</option><option>KPI</option></select></label>
   <label>To'lov<select id="sp_pay"><option value="naqd">Naqd</option><option value="karta">Karta</option></select></label>
   <label>Izoh<input id="sp_extra" placeholder="ixtiyoriy"></label>
@@ -1042,7 +1046,7 @@ function mapReturn(r) {
 }
 // 62 kundan eski kunlarni so'ralganda yuklash
 async function loadDay(d) {
-  if (d >= new Date(Date.now() - 60 * 864e5).toLocaleDateString('en-CA')) return;
+  if (d >= ymdUz(Date.now() - 60 * 864e5)) return;
   const a = new Date(d + 'T00:00:00').toISOString(), b = new Date(d + 'T23:59:59').toISOString();
   const [ss, rr] = await Promise.all([
     must(db.from('sales').select('*, sale_items(*, sale_item_costs(*))').gte('created_at', a).lte('created_at', b).order('created_at')),
@@ -1272,7 +1276,7 @@ document.addEventListener('submit', async (e) => {
     if (id === 'salF') {
       const uidv = e.target.dataset.u, sum = +v('sp_sum') || 0;
       if (sum <= 0) return toast('Summani kiriting');
-      const at = new Date(`${v('sp_date')}T${v('sp_time') || '12:00'}`);
+      const at = uzToDate(v('sp_date'), v('sp_time') || '12:00');
       const note = [v('sp_note'), v('sp_extra')].filter(Boolean).join(' · ');
       await act(() => must(db.from('expenses').insert({ user_id: S.cur, cat: 'oylik', amount_uzs: sum, to_user: uidv, note, pay: v('sp_pay'), created_at: at.toISOString() })),
         `${uName(uidv)}: ${fmt(sum)} so'm berildi`);
@@ -1342,7 +1346,7 @@ document.addEventListener('submit', async (e) => {
       closeModal();
     }
     if (id === 'seditF') {
-      const ts = new Date(`${v('se_d')}T${v('se_t') || '12:00:00'}`);
+      const ts = uzToDate(v('se_d'), v('se_t') || '12:00:00');
       await act(() => db.rpc('owner_sale_edit', { p_sale: e.target.dataset.s, p_pay: document.getElementById('se_pay').disabled ? null : v('se_pay'), p_ts: ts.toISOString() }).then(must0), 'Sotuv yangilandi');
       for (const k of Object.keys(extraSales)) delete extraSales[k];
       saleEditModal(e.target.dataset.s);
@@ -1615,9 +1619,26 @@ document.addEventListener('click', async (e) => {
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
+// Qurilma soati noto'g'ri bo'lsa ham ishlashi uchun: vaqt serverdan olinadi va butun ilovada shu ishlatiladi
+const _RealDate = Date; let _skew = 0;
+async function fixDeviceClock(cfg) {
+  try {
+    const t0 = _RealDate.now();
+    const r = await fetch(`${cfg.url}/rest/v1/rpc/server_now`, { method: 'POST', headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}`, 'Content-Type': 'application/json' }, body: '{}' });
+    const t1 = _RealDate.now(); if (!r.ok) return;
+    const srv = new _RealDate(await r.json()).getTime(); if (!isFinite(srv)) return;
+    const skew = srv - (t0 + t1) / 2;
+    if (Math.abs(skew) < 20000) return;   // 20 soniyadan kam farq — tegmaymiz
+    _skew = skew;
+    class SDate extends _RealDate { constructor(...a) { if (a.length === 0) super(_RealDate.now() + _skew); else super(...a); } static now() { return _RealDate.now() + _skew; } }
+    window.Date = SDate; globalThis.Date = SDate;
+    window.__clockSkew = skew;
+  } catch {}
+}
 async function boot() {
   const cfg = getCfg();
   if (!cfg?.url || !cfg?.key) return showSetup();
+  await fixDeviceClock(cfg);
   db = createClient(cfg.url, cfg.key, { auth: { persistSession: true, autoRefreshToken: true } });
   await enter();
 }
