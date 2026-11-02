@@ -118,6 +118,15 @@ function fitBox(box, el, min = 4.5) {
   let fs = parseFloat(getComputedStyle(el).fontSize) || 12, i = 0;
   while (box.scrollHeight > box.clientHeight + 1 && fs > min && i++ < 120) { fs -= 0.25; el.style.fontSize = fs + 'px'; }
 }
+const PRINT_TIP=(w,h)=>`<details class="small" style="margin:0"><summary style="cursor:pointer;color:var(--accent,#2bb673)">Kichik chiqyaptimi yoki sayt manzili chiqyaptimi? Bosing</summary>
+  <ol style="margin:6px 0 0;padding-left:18px;line-height:1.5">
+  <li>Chop etish oynasida <b>"Дополнительные настройки" / "More settings"</b> ni oching.</li>
+  <li><b>Размер бумаги / Paper size:</b> ${w}×${h} mm (printerda shu o'lcham bo'lishi kerak).</li>
+  <li><b>Поля / Margins:</b> <b>Нет / None</b>.</li>
+  <li><b>Масштаб / Scale:</b> По умолчанию yoki 100.</li>
+  <li><b>Колонтитулы / Headers and footers</b> belgisini <b>olib tashlang</b> — sayt manzili chiqmaydi.</li>
+  <li>Ro'yxatda ${w}×${h} bo'lmasa: Windows → Принтеры → ${esc(S.printers.label)} → Настройки печати → qog'oz o'lchamini ${w}×${h} mm qilib qo'shing.</li></ol>
+  <p style="margin:6px 0 0">Chrome bu sozlamalarni eslab qoladi — bir marta qilsangiz kifoya.</p></details>`;
 function labelModal(id){
   const p=S.products.find(x=>x.id===id); if(!p.barcode){toast('Avval shtrix-kod kiriting');return;}
   const size=S.printers.labelW+'x'+S.printers.labelH; const [lw,lh]=dims(size);
@@ -129,6 +138,7 @@ function labelModal(id){
   <label class="full row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" id="lb_noct" ${p.name.length>45?'checked':''} style="width:auto"> Telegram/Instagram'ni yashirish (uzun parametrlarga joy)</label></div>
   <div class="labels-sheet" id="lbSheet" data-p="${p.id}"></div>
   <p class="small muted" style="margin:0">Printer: ${esc(S.printers.label)}. Narx qo'yilsa, u bugungi kurs bo'yicha bo'ladi.</p>
+  ${PRINT_TIP(lw,lh)}
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button>${printBtn('labels')}</div>`);
   drawLabels();
 }
@@ -173,6 +183,7 @@ function stickerModal(ctx){stkCtx=ctx;
   </div>
   <div class="labels-sheet" id="skSheet"></div>
   <p class="small muted" style="margin:0">QR kod skanerlansa, tanlangan yo'nalishning Telegram sahifasi ochiladi. Printer: ${esc(S.printers.label)}.</p>
+  ${PRINT_TIP(S.printers.stkW,S.printers.stkH)}
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button>${printBtn('stickers')}</div>`);
   drawStickers();}
 function drawStickers(fromSel){const g=id=>document.getElementById(id); if(!g('skSheet')) return;
@@ -1164,7 +1175,7 @@ function printHtml(inner, wmm, hmm) {
   f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
   document.body.appendChild(f);
   f.contentDocument.open();
-  f.contentDocument.write(`<!doctype html><html><head><meta charset="utf-8">${fonts}${css}
+  f.contentDocument.write(`<!doctype html><html><head><meta charset="utf-8"><title> </title>${fonts}${css}
     <style>@page{size:${wmm}mm ${hmm ? hmm + 'mm' : 'auto'};margin:0}
     html,body{background:#fff!important;margin:0;padding:0}:root{padding:0!important}
     .ticket,.label,.stk{box-shadow:none!important;border-top:0!important;border-bottom:0!important;margin:0!important;max-width:none!important}
