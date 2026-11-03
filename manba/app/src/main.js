@@ -363,7 +363,7 @@ function salesHistory(){
     <div class="row small" style="margin-bottom:10px;gap:14px"><span>Sotuv: <b class="num">${fmt(rev)}</b></span>${back?`<span>Vazvrat: <b class="num" style="color:var(--bad)">−${fmt(back)}</b></span><span>Sof: <b class="num">${fmt(rev-back)}</b></span>`:''}</div>
     ${salesTable(list)}
     ${rets.length?`<h2 style="margin:18px 0 10px">Vazvratlar</h2><div class="tbl"><table><thead><tr><th>Tovar</th><th class="r">Soni</th><th class="r">Qaytarilgan pul</th><th>Sabab</th><th>Kim</th></tr></thead><tbody>
-      ${rets.map(r=>`<tr><td>${esc(r.name)}<div class="small muted">sotuv №${r.saleNo||''} · <span class="num">${dts(r.ts)}</span></div></td><td class="r num">${r.qty}</td><td class="r num">−${fmt(r.refund)}</td><td>${esc(r.reason)}</td><td>${esc(uName(r.userId))}</td></tr>`).join('')}
+      ${rets.map(r=>`<tr data-ts="${r.ts||0}"><td>${esc(r.name)}<div class="small muted">sotuv №${r.saleNo||''} · <span class="num">${dts(r.ts)}</span></div></td><td class="r num">${r.qty}</td><td class="r num">−${fmt(r.refund)}</td><td>${esc(r.reason)}</td><td>${esc(uName(r.userId))}</td></tr>`).join('')}
       </tbody></table></div>`:''}</section>`;
 }
 function returnModal(saleId){
@@ -383,7 +383,7 @@ function salesTable(list){
   if(!list.length) return '<p class="muted">Hali sotuv yo\'q.</p>';
   return `<div class="tbl"><table><thead><tr><th>№ / vaqt</th><th>Tovarlar</th><th>Sotuvchi</th><th>To'lov</th><th class="r">Summa</th>${owner()?'<th class="r">Foyda</th>':''}<th></th></tr></thead><tbody>
   ${list.slice().reverse().map(s=>{const late=s.enteredTs&&dayOf(s.enteredTs)!==dayOf(s.ts);
-    return `<tr><td class="num">${s.no?'№'+s.no:''}<div class="small muted num">${late?`${dS(s.ts)} · kiritildi ${dts(s.enteredTs)}`:tS(s.ts)}</div></td>
+    return `<tr data-ts="${s.ts||0}"><td class="num">${s.no?'№'+s.no:''}<div class="small muted num">${late?`${dS(s.ts)} · kiritildi ${dts(s.enteredTs)}`:tS(s.ts)}</div></td>
   <td>${s.items.map(i=>{const b=returnedQty(i.id);return esc(i.name)+' ×'+i.qty+(b?` <span class="chip bad" style="font-size:11px;padding:1px 7px">${b} qaytgan</span>`:'');}).join('<br>')}</td><td>${esc(uName(s.userId))}</td><td>${esc(s.pay)}</td><td class="r num">${fmt(s.totalUzs)}</td>
   ${owner()?`<td class="r num">${fmt(saleProfit(s))}</td>`:''}
   <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-receipt="${s.id}">Chek</button>${canReturn()?`<button class="sm" data-return="${s.id}">Vazvrat</button>`:''}${owner()?`<button class="sm" data-sedit="${s.id}" title="Narx, soni, to'lov turi, vaqtini o'zgartirish">✎</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`;
@@ -393,7 +393,7 @@ const saleProfit=s=>s.totalUzs-saleCost(s);
 function addToCart(p){
   const inCart=cart.find(c=>c.id===p.id);
   const have=inCart?inCart.qty:0;
-  if(have+1>p.qty){toast(`Omborda faqat ${p.qty} dona bor`);return;}
+  if(have+1>p.qty){toast(p.qty?`Omborda faqat ${p.qty} dona bor`:`${p.name}: omborda qolmagan (0 dona) — avval kirim qiling`);return;}
   if(inCart) inCart.qty++; else cart.push({id:p.id,name:p.name,line:p.line,qty:1,priceUzs:priceUzs(p),listUzs:priceUzs(p),costUsd:p.costUsd});
   render(); setTimeout(()=>document.getElementById('scanIn')?.focus(),0);
 }
@@ -419,7 +419,7 @@ function vOmbor(){
     ${owner()?`<span class="chip">Ombor qiymati: <span class="num">${usd(stockVal)}</span></span>`:''}</div>
     <input id="oSearch" placeholder="Qidirish: nomi yoki shtrix-kod" value="${esc(oSearch)}" style="margin-bottom:10px">
     <div class="tbl"><table><thead><tr><th>Kirim vaqti</th><th>Nomi</th><th>Shtrix-kod</th><th class="r">Soni</th>${owner()?'<th class="r">Kelish $</th><th class="r">Sotish $</th>':''}<th class="r">Narxi (so'm)</th><th></th></tr></thead><tbody>
-    ${list.map(p=>`<tr><td class="num small" style="white-space:nowrap">${dS(p.lastIn)}<br><span class="muted">${tS(p.lastIn)}</span></td><td>${esc(p.name)}<div><span class="chip" style="font-size:11px;padding:1px 8px;margin-top:3px">${esc(lineTitle(p.line||'kompyuter'))}</span></div></td><td class="num small">${esc(p.barcode)}</td>
+    ${list.map(p=>`<tr data-ts="${p.lastIn||0}"><td class="num small" style="white-space:nowrap">${dS(p.lastIn)}<br><span class="muted">${tS(p.lastIn)}</span></td><td>${esc(p.name)}<div><span class="chip" style="font-size:11px;padding:1px 8px;margin-top:3px">${esc(lineTitle(p.line||'kompyuter'))}</span></div></td><td class="num small">${esc(p.barcode)}</td>
     <td class="r">${p.qty<=2?`<span class="chip ${p.qty?'warn':'bad'} num">${p.qty}</span>`:`<span class="num">${p.qty}</span>`}</td>
     ${owner()?`<td class="r num">${usd(p.costUsd)}</td><td class="r num">${p.sellUzs?`<span title="So'mda qat'iy narx — kurs o'zgarsa ham o'zgarmaydi">${fmt(p.sellUzs)} so'm</span>`:usd(p.sellUsd)}</td>`:''}
     <td class="r num">${fmt(priceUzs(p))}<div class="small muted">${usd(usdP(p))}</div></td><td><div class="row" style="flex-wrap:nowrap">${owner()?`<button class="sm" data-pedit="${p.id}" title="Barcha parametrlarni o'zgartirish">✎</button>`:''}<button class="sm" data-label="${p.id}">Etiketka</button><button class="sm" data-stk="p${p.id}">Yopishtirgich</button></div></td></tr>`).join('')}
@@ -436,7 +436,7 @@ function movesPanel(){
   return `<section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Kirim-chiqim tarixi</h2>
     <select id="mvFilter" style="width:auto">${[['hammasi','Hammasi'],['kirim','Kirim'],['sotuv','Sotuv (chiqim)'],['tuzatish','Tuzatish']].map(([k,n])=>`<option value="${k}" ${k===mvFilter?'selected':''}>${n}</option>`).join('')}</select></div>
   <div class="tbl"><table><thead><tr><th>Vaqt</th><th>Tovar</th><th>Turi</th><th class="r">Soni</th><th>Kim</th><th></th></tr></thead><tbody>
-  ${list.slice(0,200).map(m=>`<tr><td class="num small">${dts(m.ts)}</td><td>${esc(pn(m.productId))}${m.ref?`<div class="small muted">${esc(m.ref)}</div>`:''}</td><td>${MV_N[m.reason]||esc(m.reason)}</td>
+  ${list.slice(0,200).map(m=>`<tr data-ts="${m.ts||0}"><td class="num small">${dts(m.ts)}</td><td>${esc(pn(m.productId))}${m.ref?`<div class="small muted">${esc(m.ref)}</div>`:''}</td><td>${MV_N[m.reason]||esc(m.reason)}</td>
     <td class="r num"><b style="color:${m.delta>0?'var(--ok,#2bb673)':'var(--bad,#e5484d)'}">${m.delta>0?'+':''}${m.delta}</b></td><td class="small">${esc(uName(m.userId))}</td>
     <td>${m.reason==='sotuv'?'':`<button class="sm" data-mvedit="${m.id}" title="Sonini o'zgartirish">✎</button>`}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">Hali harakat yo\'q</td></tr>'}
   </tbody></table></div><p class="small muted" style="margin:6px 0 0">Kirim yoki tuzatish sonini o'zgartirsangiz, ombordagi qoldiq farq qadar o'zgaradi. Sotuvni "Sotuv" bo'limidagi ✎ tugmasi bilan tahrirlang.</p></section>`;
@@ -500,7 +500,7 @@ function vUstaxona(){
       <input id="rSearch" placeholder="Talon №, telefon, ism…" value="${esc(rSearch)}" style="flex:1;min-width:160px">
     </div>
     <div class="tbl"><table><thead><tr><th>Talon</th><th>Mijoz</th><th>Qurilma / muammo</th><th>Holati</th><th class="r">Narx</th><th></th></tr></thead><tbody>
-    ${list.map(r=>`<tr><td class="talonno">№${tn(r.talon)}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div></td>
+    ${list.map(r=>`<tr data-ts="${r.ts||0}"><td class="talonno">№${tn(r.talon)}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div></td>
       <td>${esc(r.name)}<div class="small muted num">${esc(r.phone)}</div>${r.phone2?`<div class="small muted num">2: ${esc(r.phone2)}</div>`:''}${r.phoneOld?`<div class="small muted num" title="Avvalgi (o'zgartirilgan) raqam"><s>${esc(r.phoneOld)}</s> eski</div>`:''}</td>
       <td>${esc(r.device)}${r.model?' · '+esc(r.model):''}<div class="small muted">${esc(r.problem)}</div><div class="small muted">Usta: ${esc(uName(r.masterId))}</div></td>
       <td><select data-st="${r.talon}" style="width:auto;padding:4px 8px" aria-label="Holati">${STATUSES.map(s=>`<option value="${s[0]}" ${s[0]===r.status?'selected':''}>${s[1]}</option>`).join('')}</select>
@@ -667,7 +667,7 @@ function userBlock(u){
       <div class="stat"><div class="k">Shu oy topshirildi</div><div class="v">${doneMon.length}</div></div>
       <div class="stat"><div class="k">Shu oy ish summasi</div><div class="v">${fmt(doneMon.reduce((a,r)=>a+(+r.feeUzs||0),0))}</div></div></div></section>
     <section class="panel"><h2>Ishdagi qurilmalar</h2><div class="tbl"><table><thead><tr><th>Talon</th><th>Qurilma / muammo</th><th>Mijoz</th><th>Holati</th><th></th></tr></thead><tbody>
-    ${act.map(r=>`<tr><td class="talonno">№${tn(r.talon)}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div></td>
+    ${act.map(r=>`<tr data-ts="${r.ts||0}"><td class="talonno">№${tn(r.talon)}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div></td>
       <td>${esc(r.device)}${r.model?' · '+esc(r.model):''}<div class="small muted">${esc(r.problem)}</div></td>
       <td>${esc(r.name)}<div class="small muted num">${esc(r.phone)}</div></td>
       <td><select data-st="${r.talon}" style="width:auto;padding:4px 8px" aria-label="Holati">${STATUSES.map(s=>`<option value="${s[0]}" ${s[0]===r.status?'selected':''}>${s[1]}</option>`).join('')}</select></td>
@@ -766,7 +766,7 @@ function vNasiya(){
     <select id="nFilter" style="width:auto"><option value="faol">Faol qarzlar</option><option value="otgan">Muddati o'tgan</option><option value="hafta">7 kun ichida</option><option value="yopiq">Yopilganlar</option><option value="hammasi">Hammasi</option></select>
     <input id="nSearch" placeholder="Ism, telefon…" value="${esc(nSearch)}" style="flex:1;min-width:160px"></div>
     <div class="tbl"><table><thead><tr><th>Mijoz</th><th>Nima olgan</th><th class="r">Summa</th><th class="r">To'langan</th><th class="r">Qoldiq</th><th>Muddat</th><th></th></tr></thead><tbody>
-    ${list.map(d=>`<tr style="${!d.closed&&d.due&&d.due<t?'background:var(--bad-soft)':''}">
+    ${list.map(d=>`<tr data-ts="${d.ts||0}" style="${!d.closed&&d.due&&d.due<t?'background:var(--bad-soft)':''}">
       <td class="who">${esc(d.name)}<div class="small muted num">${esc(d.phone)}</div><div class="small muted num">${dts(d.ts)}</div></td>
       <td class="small">${debtItems(d)}<div class="muted">${dayOf(d.ts)}${d.note?' · '+esc(d.note):''}</div></td>
       <td class="r num">${fmt(d.amount)}</td><td class="r num">${fmt(d.paid)}</td>
@@ -854,7 +854,7 @@ function vQarz(){
     <input id="dSearch" placeholder="Kimdan, telefon, tovar…" value="${esc(dSearch)}" style="flex:1;min-width:160px"></div>
     <div class="tbl"><table><thead><tr><th>Sana</th><th>Kimdan</th><th>Tovar</th><th class="r">Summa</th><th class="r">To'langan</th><th class="r">Qoldiq</th><th></th></tr></thead><tbody>
     ${list.map(d=>{const left=d.amount-d.paid, late=!d.closed&&d.due&&d.due<today0;
-      return `<tr><td class="num small">${dts(d.ts)}${d.due?`<div class="small ${late?'':'muted'}" style="${late?'color:var(--bad)':''}">muddat ${d.due}</div>`:''}</td>
+      return `<tr data-ts="${d.ts||0}"><td class="num small">${dts(d.ts)}${d.due?`<div class="small ${late?'':'muted'}" style="${late?'color:var(--bad)':''}">muddat ${d.due}</div>`:''}</td>
       <td class="who">${esc(d.supplier)}<div class="small muted num">${esc(d.phone)}</div></td>
       <td>${d.type?`<span class="chip" style="font-size:11px;padding:1px 8px">${esc(d.type)}</span> `:''}${esc(d.name)} <span class="muted">× ${d.qty}</span>${d.barcode?` <span class="chip ok" style="font-size:11px;padding:1px 8px" title="Shtrix-kod ${esc(d.barcode)}">📦 omborga kirdi</span>`:''}${d.note?`<div class="small muted">${esc(d.note)}</div>`:''}${owner()?`<div class="small muted">kiritdi: ${esc(uName(d.userId))}</div>`:''}</td>
       <td class="r num">${money(d.amount,d.cur)}</td><td class="r num">${money(d.paid,d.cur)}</td>
@@ -897,7 +897,7 @@ function vRasxod(){
     <div class="stat"><div class="k">Shu oy jami</div><div class="v">${fmt(sum(list))}</div></div>
     ${byCat.slice(0,2).map(([k,v])=>`<div class="stat"><div class="k">${CATS[k]}</div><div class="v">${fmt(v)}</div></div>`).join('')}</div>
     <div class="tbl" style="margin-top:14px"><table><thead><tr><th>Sana</th><th>Turi</th><th>Izoh</th>${owner()?'<th>Kiritgan</th>':''}<th class="r">Summa</th>${owner()?'<th></th>':''}</tr></thead><tbody>
-    ${list.slice().reverse().map(e=>`<tr><td class="num small">${dts(e.ts)}</td><td>${CATS[e.cat]}${e.toUser?`<div class="small muted">→ ${esc(uName(e.toUser))}</div>`:''}</td><td>${esc(e.note)}</td>
+    ${list.slice().reverse().map(e=>`<tr data-ts="${e.ts||0}"><td class="num small">${dts(e.ts)}</td><td>${CATS[e.cat]}${e.toUser?`<div class="small muted">→ ${esc(uName(e.toUser))}</div>`:''}</td><td>${esc(e.note)}</td>
     ${owner()?`<td>${esc(uName(e.userId))}</td>`:''}<td class="r num">${fmt(e.amountUzs)}</td>${owner()?`<td><button class="sm ghost" data-delexp="${e.id}" aria-label="O'chirish">✕</button></td>`:''}</tr>`).join('')||`<tr><td colspan="6" class="muted">Bu oyda rasxod yo'q</td></tr>`}
     </tbody></table></div></section>`;
 }
@@ -919,7 +919,7 @@ function salaryHistory(uid){
   return `<section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">${uid&&!owner()?'Menga berilgan oyliklar':'Oylik berish tarixi'}</h2>
     <div class="row"><select id="salMon" style="width:auto">${mons.map(x=>`<option value="${x}" ${x===m?'selected':''}>${x}</option>`).join('')}</select><span class="chip">Jami: <span class="num">${fmt(tot)}</span> so'm</span></div></div>
   <div class="tbl"><table><thead><tr><th>Sana va vaqt</th>${uid?'':'<th>Xodim</th>'}<th class="r">Summa</th><th>Turi</th><th>Izoh</th>${owner()?'<th>Kim berdi</th><th></th>':''}</tr></thead><tbody>
-  ${list.map(x=>`<tr><td class="num">${dS(x.ts)} <span class="muted">${tS(x.ts)}</span></td>${uid?'':`<td>${esc(uName(x.toUser))}</td>`}
+  ${list.map(x=>`<tr data-ts="${x.ts||0}"><td class="num">${dS(x.ts)} <span class="muted">${tS(x.ts)}</span></td>${uid?'':`<td>${esc(uName(x.toUser))}</td>`}
     <td class="r num"><b>${fmt(x.amountUzs)}</b></td><td>${x.pay==='karta'?'Karta':'Naqd'}</td><td class="small">${esc(x.note)}</td>
     ${owner()?`<td class="small muted">${esc(uName(x.userId))}</td><td><button class="sm ghost" data-saldel="${x.id}" title="O'chirish">✕</button></td>`:''}</tr>`).join('')||`<tr><td colspan="7" class="muted">Bu oyda oylik berilmagan</td></tr>`}
   </tbody></table></div></section>`;
@@ -1014,6 +1014,12 @@ async function camScan(onCode){
     if(m) m.textContent=e?.name==='NotAllowedError'?'Kameraga ruxsat berilmadi. Brauzer manzil satridagi 🔒 belgisidan kameraga ruxsat bering.':e?.name==='NotFoundError'?'Kamera topilmadi. USB skaner ulang yoki kodni qo\'lda yozing.':'Kamera ochilmadi: '+(e?.message||e);
   }
 }
+// Shtrix-kod solishtirish: boshidagi nollar va EAN-13/UPC-A farqini hisobga oladi
+const codeNorm = (c) => String(c || '').trim().replace(/\s+/g, '').replace(/^0+(?=\d)/, '').toUpperCase();
+function findByCode(c) {
+  const v = String(c || '').trim(); if (!v) return null;
+  return S.products.find((p) => p.barcode === v) || S.products.find((p) => codeNorm(p.barcode) === codeNorm(v)) || null;
+}
 // Sotuvda qidirish: nomidagi har bir so'z yoki shtrix-kod bo'yicha (raqamlar ham, masalan 5070)
 function findProducts(q){
   const words = String(q||'').toLowerCase().split(/\s+/).filter(Boolean); if (!words.length) return [];
@@ -1054,8 +1060,8 @@ function render(){
 }
 /* ---------- Jadval ustunlari bo'yicha saralash (sarlavhani bosish: o'sish / kamayish) ---------- */
 const SORT_KEY='comtech_sort';
-let sortState=(()=>{try{return JSON.parse(localStorage.getItem(SORT_KEY))||{};}catch{return {};}})();
-function sortSave(){try{localStorage.setItem(SORT_KEY,JSON.stringify(sortState));}catch{}}
+let sortState=(()=>{try{localStorage.removeItem(SORT_KEY);return JSON.parse(sessionStorage.getItem(SORT_KEY))||{};}catch{return {};}})();
+function sortSave(){try{sessionStorage.setItem(SORT_KEY,JSON.stringify(sortState));}catch{}}
 function cellKey(td){
   if(!td) return '';
   if(td.dataset.sort!=null) return td.dataset.sort;
@@ -1075,6 +1081,8 @@ function sortVal(s){
 // Vaqt bo'yicha tartib: barcha bo'limlarda "yangisi tepada" yoki "eskisi tepada"
 let timeOrder=(()=>{try{return localStorage.getItem('comtech_torder')||'desc'}catch{return 'desc'}})();
 function rowTimeKey(r){
+  if(r.dataset&&r.dataset.ts&&+r.dataset.ts) return String(+r.dataset.ts).padStart(15,'0');
+  if(r.closest('table')?.querySelector('tr[data-ts]')) return null;
   const t=r.textContent||''; const d=t.match(/(\d{2})\.(\d{2})\.(\d{4})/), h=t.match(/(?:^|[^\d])(\d{2}):(\d{2})(?::(\d{2}))?(?!\d)/);
   if(!d&&!h) return null;
   return (d?d[3]+d[2]+d[1]:'00000000')+(h?h[1]+h[2]+(h[3]||'00'):'000000');
@@ -1260,6 +1268,7 @@ async function liveUpdate() {
 }
 function keepScroll(fn) { const y = window.scrollY; fn(); window.scrollTo(0, y); }
 document.addEventListener('focusout', () => setTimeout(() => { if (pendingRender && !busy()) { pendingRender = false; keepScroll(render); } }, 400));
+document.addEventListener('visibilitychange', () => { if (!document.hidden && db && S && !busy()) { clearTimeout(rtTimer); rtTimer = setTimeout(liveUpdate, 300); } });
 function subscribe() {
   db.channel('comtech-live')
     .on('postgres_changes', { event: '*', schema: 'public' }, () => { clearTimeout(rtTimer); rtTimer = setTimeout(liveUpdate, 700); })
@@ -1365,8 +1374,11 @@ document.addEventListener('submit', async (e) => {
     }
     if (id === 'scanF') {
       const val = v('scanIn'); if (!val) return;
-      const p = S.products.find((p) => p.barcode === val);
-      if (p) return addToCart(p);
+      let p = findByCode(val);
+      if (!p && /^[\dA-Za-z-]{4,}$/.test(val)) {   // telefonda ro'yxat eskirgan bo'lishi mumkin — bazadan to'g'ridan-to'g'ri tekshiramiz
+        try { await refresh(); p = findByCode(val); } catch {}
+      }
+      if (p) { document.getElementById('scanIn') && (document.getElementById('scanIn').value = ''); showSugg(''); return addToCart(p); }
       const m = findProducts(val);
       if (m.length === 1) { document.getElementById('scanIn').value = ''; showSugg(''); return addToCart(m[0]); }
       showSugg(val);
@@ -1553,12 +1565,12 @@ document.addEventListener('input', (e) => {
   if (t.id === 'r_phone') { const c = S.clients.find((c) => c.phone === t.value.replace(/\s/g, '')); if (c) document.getElementById('r_name').value = c.name; }
   if (t.id === 'k_sell') kConv();
   if (t.id === 'd_bar') {
-    const p = S.products.find((p) => p.barcode === t.value.trim()), h = document.getElementById('d_hint');
+    const p = findByCode(t.value), h = document.getElementById('d_hint');
     if (p) { document.getElementById('d_name').value = p.name; document.getElementById('d_line').value = p.line || 'kompyuter'; if (h) h.textContent = `Mavjud tovar: omborda ${p.qty} dona. Sotish narxini bo'sh qoldirsangiz eski narx (${fmt(priceUzs(p))} so'm) qoladi.`; }
     else if (h) h.textContent = t.value.trim() ? "Yangi tovar: sotish narxini kiriting — omborga qo'shiladi." : "Shtrix-kod kiritilsa tovar omborga qo'shiladi va sotuvda skanerlanadi; sotilganda ombordan o'zi ayriladi.";
   }
   if (t.id === 'k_bar') {
-    const p = S.products.find((p) => p.barcode === t.value.trim());
+    const p = findByCode(t.value);
     if (p) { k_name.value = p.name; k_line.value = p.line || 'kompyuter'; if (owner()) { if (p.sellUzs && kCur !== 'uzs') setKCur('uzs'); k_cost.value = kCur === 'uzs' ? Math.round(p.costUsd * S.rate / 1000) * 1000 : p.costUsd; k_sell.value = kCur === 'uzs' ? priceUzs(p) : p.sellUsd; kConv(); } k_hint.textContent = `Mavjud tovar: omborda ${p.qty} dona`; }
   }
 });
