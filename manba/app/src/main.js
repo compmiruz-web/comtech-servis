@@ -472,12 +472,13 @@ function vUstaxona(){
   let list=S.repairs.slice().sort((a,b)=>b.talon-a.talon);
   if(rFilter==='aktiv') list=list.filter(r=>r.status!=='berildi');
   else if(rFilter!=='hammasi') list=list.filter(r=>r.status===rFilter);
-  if(q) list=list.filter(r=>tn(r.talon).includes(q)||r.phone.includes(q)||r.name.toLowerCase().includes(q)||(r.model||'').toLowerCase().includes(q));
+  if(q) list=list.filter(r=>tn(r.talon).includes(q)||r.phone.includes(q)||(r.phone2||'').includes(q)||(r.phoneOld||'').includes(q)||r.name.toLowerCase().includes(q)||(r.model||'').toLowerCase().includes(q));
   return `<section class="panel"><h2>Qurilma qabul qilish · keyingi talon <span class="talonno">№${S.nextTalon}</span></h2>
     <form id="qabulF" class="form">
       <label>Telefon raqami<input id="r_phone" required inputmode="tel" placeholder="+998 90 123 45 67" list="phones"></label>
       <datalist id="phones">${S.clients.map(c=>`<option value="${esc(c.phone)}">${esc(c.name)}</option>`).join('')}</datalist>
       <label>Mijoz ismi<input id="r_name" required></label>
+      <label>Qo'shimcha raqam (ixtiyoriy)<input id="r_phone2" inputmode="tel" placeholder="+998 __ ___ __ __"></label>
       <label>Qurilma<select id="r_dev"><option>Noutbuk</option><option>Kompyuter (sistema blok)</option><option>Monoblok</option><option>Printer</option><option>Monitor</option><option>Boshqa</option></select></label>
       <label>Modeli<input id="r_model" placeholder="Acer Aspire 5"></label>
       <label>Seriya raqami<input id="r_serial"></label>
@@ -494,7 +495,7 @@ function vUstaxona(){
     </div>
     <div class="tbl"><table><thead><tr><th>Talon</th><th>Mijoz</th><th>Qurilma / muammo</th><th>Holati</th><th class="r">Narx</th><th></th></tr></thead><tbody>
     ${list.map(r=>`<tr><td class="talonno">№${tn(r.talon)}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div></td>
-      <td>${esc(r.name)}<div class="small muted num">${esc(r.phone)}</div></td>
+      <td>${esc(r.name)}<div class="small muted num">${esc(r.phone)}</div>${r.phone2?`<div class="small muted num">2: ${esc(r.phone2)}</div>`:''}${r.phoneOld?`<div class="small muted num" title="Avvalgi (o'zgartirilgan) raqam"><s>${esc(r.phoneOld)}</s> eski</div>`:''}</td>
       <td>${esc(r.device)}${r.model?' · '+esc(r.model):''}<div class="small muted">${esc(r.problem)}</div><div class="small muted">Usta: ${esc(uName(r.masterId))}</div></td>
       <td><select data-st="${r.talon}" style="width:auto;padding:4px 8px" aria-label="Holati">${STATUSES.map(s=>`<option value="${s[0]}" ${s[0]===r.status?'selected':''}>${s[1]}</option>`).join('')}</select>
         <div style="margin-top:4px"><span class="status s-${r.status}">${stName(r.status)}</span></div></td>
@@ -510,7 +511,7 @@ function ticketHtml(r){
   <div class="tn"><span>TALON</span><span class="bigno">№${tn(r.talon)}</span></div>
   <div class="kv"><span>${dS(r.ts)}</span><span>${tS(r.ts)}</span></div>
   ${code128Svg('T'+r.talon,30)}<hr>
-  <div class="f"><span>Mijoz</span><span>${esc(r.name)}</span><span>Tel</span><span>${esc(r.phone)}</span>
+  <div class="f"><span>Mijoz</span><span>${esc(r.name)}</span><span>Tel</span><span>${esc(r.phone)}</span>${r.phone2?`<span>Tel 2</span><span>${esc(r.phone2)}</span>`:''}
   <span>Qurilma</span><span>${esc(r.device)} ${esc(r.model||'')}</span>${r.serial?`<span>S/N</span><span>${esc(r.serial)}</span>`:''}
   ${r.acc?`<span>Komplekt</span><span>${esc(r.acc)}</span>`:''}<span>Muammo</span><span>${esc(r.problem)}</span>
   ${r.feeUzs?`<span>Narx ~</span><span>${fmt(r.feeUzs)} so'm</span>`:''}
@@ -527,6 +528,8 @@ function editRepair(t){
   modal(`<h3>Talon №${tn(r.talon)} · tahrirlash</h3><form id="rEditF" class="form" data-t="${r.talon}">
     <label>Telefon raqami<input id="re_phone" required inputmode="tel" value="${esc(r.phone)}" list="phones2"></label>
     <datalist id="phones2">${S.clients.map(c=>`<option value="${esc(c.phone)}">${esc(c.name)}</option>`).join('')}</datalist>
+    <label>Qo'shimcha raqam (ixtiyoriy)<input id="re_phone2" inputmode="tel" value="${esc(r.phone2)}" placeholder="+998 __ ___ __ __"></label>
+    ${r.phoneOld?`<div class="full small" style="background:var(--sunk);border-radius:8px;padding:8px 10px">Eski raqam: <b class="num">${esc(r.phoneOld)}</b> <button type="button" class="sm" data-rold="${r.talon}">Asosiy raqamga qaytarish</button> <button type="button" class="sm" data-rold2="${r.talon}">Qo'shimcha raqam qilish</button></div>`:''}
     <label>Mijoz ismi<input id="re_name" required value="${esc(r.name)}"></label>
     <label>Qurilma<input id="re_dev" required value="${esc(r.device)}"></label>
     <label>Modeli<input id="re_model" value="${esc(r.model)}"></label>
@@ -1182,7 +1185,7 @@ async function refresh() {
     products: prods.map((p) => ({ id: p.id, name: p.name, barcode: p.barcode, line: p.line, qty: p.qty, sellUsd: +p.sell_usd, sellUzs: p.sell_uzs == null ? null : +p.sell_uzs, costUsd: costMap[p.id] ?? 0 })),
     clients: cls.map((c) => ({ phone: c.phone, name: c.name, tg: !!c.tg_chat_id })),
     repairs: reps.map((r) => ({
-      talon: r.talon, ts: ms(r.created_at), phone: r.client_phone, name: r.client_name, device: r.device, model: r.model || '',
+      talon: r.talon, ts: ms(r.created_at), phone: r.client_phone, phone2: r.client_phone2 || '', phoneOld: r.client_phone_old || '', name: r.client_name, device: r.device, model: r.model || '',
       serial: r.serial || '', problem: r.problem, acc: r.accessories || '', status: r.status, feeUzs: +r.fee_uzs,
       masterId: r.master_id, acceptedBy: r.accepted_by, doneTs: ms(r.done_at),
     })),
@@ -1346,7 +1349,7 @@ document.addEventListener('submit', async (e) => {
     if (id === 'qabulF') {
       const r = await act(() => must(db.rpc('intake_repair', { p: {
         phone: v('r_phone').replace(/\s/g, ''), name: v('r_name'), device: v('r_dev'), model: v('r_model'), serial: v('r_serial'),
-        problem: v('r_prob'), accessories: v('r_acc'), fee_uzs: +v('r_fee') || 0, master_id: v('r_master') } })), (r) => `Talon №${tn(r.talon)} berildi`);
+        problem: v('r_prob'), accessories: v('r_acc'), fee_uzs: +v('r_fee') || 0, master_id: v('r_master'), phone2: v('r_phone2') } })), (r) => `Talon №${tn(r.talon)} berildi`);
       showTalon(r.talon);
     }
     if (id === 'rEditF') {
@@ -1354,7 +1357,7 @@ document.addEventListener('submit', async (e) => {
       await act(async () => {
         if (phone !== '+998000000000') await must(db.from('clients').upsert({ phone, name }, { onConflict: 'phone' }));
         else if (!S.clients.some((c) => c.phone === phone)) await must(db.from('clients').insert({ phone, name: 'Telefon yozilmagan' }));
-        await must(db.from('repairs').update({ client_phone: phone, client_name: name, device: v('re_dev'), model: v('re_model') || null,
+        await must(db.from('repairs').update({ client_phone: phone, client_phone2: v('re_phone2').replace(/[\s-]/g, '') || null, client_name: name, device: v('re_dev'), model: v('re_model') || null,
           serial: v('re_serial') || null, accessories: v('re_acc') || null, problem: v('re_prob') }).eq('talon', t));
       }, `Talon №${tn(t)} saqlandi`);
       closeModal();
@@ -1626,6 +1629,10 @@ document.addEventListener('click', async (e) => {
       const k = b.dataset.stk;
       if (k[0] === 'r') { const r = S.repairs.find((x) => x.talon == k.slice(1)); stickerModal({ line: 'servis', ref: '№' + tn(r.talon), war: warLoad('servis', 'servis'), from: r.doneTs || Date.now() }); }
       else { const p = S.products.find((x) => x.id === k.slice(1)); stickerModal({ line: p.line, war: warLoad(p.id, p.line), pid: p.id, name: p.name }); }
+    }
+    if (b.dataset.rold || b.dataset.rold2) {
+      const r = S.repairs.find((x) => x.talon === +(b.dataset.rold || b.dataset.rold2));
+      if (r) { if (b.dataset.rold) document.getElementById('re_phone').value = r.phoneOld; else document.getElementById('re_phone2').value = r.phoneOld; toast("Saqlash tugmasini bosing"); }
     }
     if (b.dataset.pedit) productEditModal(b.dataset.pedit);
     if (b.dataset.pdel) modal(`<h3>Tovarni o'chirish</h3><p>${esc(S.products.find((p) => p.id === b.dataset.pdel)?.name || '')} butunlay o'chirilsinmi? Sotuvlar tarixida nomi saqlanib qoladi.</p><div class="row" style="justify-content:flex-end"><button type="button" data-close>Yo'q</button><button class="pri" data-pdelyes="${b.dataset.pdel}">Ha, o'chirish</button></div>`);
