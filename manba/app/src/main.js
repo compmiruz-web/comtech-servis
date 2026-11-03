@@ -84,7 +84,12 @@ function code128Svg(text,h){
 const brandHtml=()=>{const n=esc(S.company.name||'');const i=n.indexOf('-');return i>0?n.slice(0,i)+'<i>-</i>'+n.slice(i+1):n;};
 const LINE_NAMES={servis:'Servis',noutbuk:'Noutbuklar',kompyuter:'Kompyuterlar (korpus, gaming, qismlar)'};
 const LINE_SHORT={servis:'Servis',noutbuk:'Noutbuk',kompyuter:'Kompyuter'};
-const lineOf=k=>S.company.lines[k]||S.company.lines.kompyuter;
+const lineOf=k=>S.company.lines[k]||S.company.lines.servis||S.company.lines.kompyuter;
+const BASE_LINES=['noutbuk','kompyuter','servis'];
+const lineKeys=()=>[...BASE_LINES,...Object.keys(S.company.lines||{}).filter(k=>!BASE_LINES.includes(k))];
+const lineTitle=k=>LINE_SHORT[k]||S.company.lines?.[k]?.title||k;
+const lineOptions=sel=>lineKeys().map(k=>`<option value="${k}" ${k===sel?'selected':''}>${esc(k==='kompyuter'?'Kompyuter / qism':lineTitle(k))}</option>`).join('');
+const lineAddBtn=target=>owner()?`<button type="button" class="sm" data-lineadd="${target}" title="Yangi bo'lim (yo'nalish) yaratish">+ Bo'lim</button>`:'';
 // Yo'nalish brendi: NOUTBUK SAVDOSI, KOMPYUTER.UZ; bo'sh bo'lsa kompaniya nomi
 const brandOf=k=>(lineOf(k).brand||'').trim()||S.company.name;
 const contactsHtml=k=>{const c=lineOf(k);return `<div class="contacts">${c.phone?`<b>Tel: ${esc(c.phone)}</b><br>`:''}${[c.telegram&&'TG '+esc(c.telegram),c.instagram&&'IG '+esc(c.instagram)].filter(Boolean).join(' · ')}</div>`;};
@@ -168,7 +173,7 @@ function stickerHtml(o){const c=lineOf(o.line); const q=o.qr&&c.telegram?qrSvg(t
   const till=+o.wn>0?warUntil(o.from,o.wn,o.wu):'';
   const [w,h]=dims(o.size), fs=Math.max(6,Math.min(w*.19,h*.275)).toFixed(1);
   return `<div class="stk ${q?'':'noqr'}" style="width:${w}mm;height:${h}mm;font-size:${fs}px;--qr:${Math.min(h*.36,w*.25).toFixed(1)}mm">
-  <div><div class="sb">${esc(brandOf(o.line))}</div><div class="ss">${brandOf(o.line)!==S.company.name?esc(S.company.name):(STK_TITLE[o.line]||'')}</div>
+  <div><div class="sb">${esc(brandOf(o.line))}</div><div class="ss">${brandOf(o.line)!==S.company.name?esc(S.company.name):(STK_TITLE[o.line]||lineTitle(o.line))}</div>
   <div class="sp">${esc(c.phone)}</div><div class="so">${c.telegram?'TG '+esc(c.telegram):''}<br>${c.instagram?'IG '+esc(c.instagram):''}</div></div>
   ${q?`<div class="qr">${q}</div>`:''}
   ${o.name?`<div class="sn">${esc(o.name).replace(/\|/g,'|<wbr>')}</div>`:''}
@@ -177,7 +182,7 @@ let stkCtx={};
 function stickerModal(ctx){stkCtx=ctx;
   modal(`<h3>Yopishtirgich${ctx.ref?' · '+esc(ctx.ref):''}</h3>
   <div class="form">
-    <label>Yo'nalish<select id="sk_line">${Object.keys(STK_TITLE).map(k=>`<option value="${k}" ${k===ctx.line?'selected':''}>${STK_TITLE[k]}</option>`).join('')}</select></label>
+    <label>Yo'nalish<select id="sk_line">${lineKeys().map(k=>`<option value="${k}" ${k===ctx.line?'selected':''}>${esc(STK_TITLE[k]||lineTitle(k))}</option>`).join('')}</select></label>
     ${sizeFields('sk',S.printers.stkW,S.printers.stkH)}
     ${warFields('sk',ctx.war||warDefault(ctx.line),true,ctx.from)}
     <label>Nechta<input id="sk_n" type="number" min="1" max="100" value="1" class="num"></label>
@@ -246,6 +251,7 @@ const priceUzs=p=>p.sellUzs?+p.sellUzs:Math.ceil(p.sellUsd*S.rate/1000)*1000;
 let kCur=(()=>{try{return localStorage.getItem('comtech_kcur')||'usd'}catch{return 'usd'}})();
 const kSym=()=>kCur==='uzs'?"so'm":'$';
 const tn=n=>String(n).padStart(4,'0');
+let lineAddCtx=null;
 let cart=[]; let tab='sotuv'; let rFilter='hammasi'; let rSearch=''; let oSearch=''; let cSearch='';
 
 function toast(t){const el=document.getElementById('toast');el.textContent=t;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,2600);}
@@ -401,7 +407,7 @@ function vOmbor(){
     <form id="kirimF" class="form">
       <label>Shtrix-kod<span class="row" style="flex-wrap:nowrap"><input id="k_bar" required inputmode="numeric" placeholder="Skanerlang"><button type="button" class="sm" data-cam="k_bar" title="Kamera bilan skanerlash">📷</button><button type="button" class="sm" id="genBar" title="Shtrix-kodi yo'q tovar uchun">Yaratish</button></span></label>
       <label class="full">Nomi<input id="k_name" required placeholder="Masalan: SSD Samsung 870 EVO 500GB"></label>
-      <label>Yo'nalish (etiketka uchun)<select id="k_line"><option value="noutbuk">Noutbuk</option><option value="kompyuter" selected>Kompyuter / qism</option><option value="servis">Servis</option></select></label>
+      <label>Bo'lim (etiketka uchun)<span class="row" style="flex-wrap:nowrap"><select id="k_line" style="flex:1">${lineOptions('kompyuter')}</select>${lineAddBtn('k_line')}</span></label>
       <label>Soni<input id="k_qty" type="number" min="1" value="1" required></label>
       <label>Narx valyutasi<select id="k_cur"><option value="usd" ${kCur==='usd'?'selected':''}>Dollarda ($)</option><option value="uzs" ${kCur==='uzs'?'selected':''}>So'mda</option></select></label>
       <label><span id="k_costL">Kelish narxi (${kSym()})</span><input id="k_cost" type="number" step="${kCur==='uzs'?'1000':'0.01'}" min="0" ${owner()?'required':'placeholder="Mavjud tovarda bo\'sh qoldiring"'}></label>
@@ -413,7 +419,7 @@ function vOmbor(){
     ${owner()?`<span class="chip">Ombor qiymati: <span class="num">${usd(stockVal)}</span></span>`:''}</div>
     <input id="oSearch" placeholder="Qidirish: nomi yoki shtrix-kod" value="${esc(oSearch)}" style="margin-bottom:10px">
     <div class="tbl"><table><thead><tr><th>Nomi</th><th>Shtrix-kod</th><th class="r">Soni</th>${owner()?'<th class="r">Kelish $</th><th class="r">Sotish $</th>':''}<th class="r">Narxi (so'm)</th><th></th></tr></thead><tbody>
-    ${list.map(p=>`<tr><td>${esc(p.name)}<div><span class="chip" style="font-size:11px;padding:1px 8px;margin-top:3px">${LINE_SHORT[p.line]||'Kompyuter'}</span></div></td><td class="num small">${esc(p.barcode)}</td>
+    ${list.map(p=>`<tr><td>${esc(p.name)}<div><span class="chip" style="font-size:11px;padding:1px 8px;margin-top:3px">${esc(lineTitle(p.line||'kompyuter'))}</span></div></td><td class="num small">${esc(p.barcode)}</td>
     <td class="r">${p.qty<=2?`<span class="chip ${p.qty?'warn':'bad'} num">${p.qty}</span>`:`<span class="num">${p.qty}</span>`}</td>
     ${owner()?`<td class="r num">${usd(p.costUsd)}</td><td class="r num">${p.sellUzs?`<span title="So'mda qat'iy narx — kurs o'zgarsa ham o'zgarmaydi">${fmt(p.sellUzs)} so'm</span>`:usd(p.sellUsd)}</td>`:''}
     <td class="r num">${fmt(priceUzs(p))}<div class="small muted">${usd(usdP(p))}</div></td><td><div class="row" style="flex-wrap:nowrap">${owner()?`<button class="sm" data-pedit="${p.id}" title="Barcha parametrlarni o'zgartirish">✎</button>`:''}<button class="sm" data-label="${p.id}">Etiketka</button><button class="sm" data-stk="p${p.id}">Yopishtirgich</button></div></td></tr>`).join('')}
@@ -441,7 +447,7 @@ function productEditModal(id){
   modal(`<h3>${id?'Tovarni tahrirlash':'Yangi tovar'}</h3><form id="peditF" data-p="${id||''}" style="display:grid;gap:10px">
     <label>Nomi / parametrlari<textarea id="pe_name" rows="3" required>${esc(p.name)}</textarea></label>
     <label>Shtrix-kod<span class="row" style="flex-wrap:nowrap"><input id="pe_bar" required value="${esc(p.barcode)}" class="num"><button type="button" class="sm" data-cam="pe_bar">📷</button><button type="button" class="sm" data-genbar="pe_bar">Yangi</button></span></label>
-    <div class="row" style="flex-wrap:nowrap;gap:10px"><label style="flex:1">Yo'nalish<select id="pe_line"><option value="noutbuk" ${p.line==='noutbuk'?'selected':''}>Noutbuk</option><option value="kompyuter" ${p.line==='kompyuter'||!p.line?'selected':''}>Kompyuter / qism</option><option value="servis" ${p.line==='servis'?'selected':''}>Servis</option></select></label>
+    <div class="row" style="flex-wrap:nowrap;gap:10px"><label style="flex:1">Bo'lim<span class="row" style="flex-wrap:nowrap"><select id="pe_line" style="flex:1">${lineOptions(p.line||'kompyuter')}</select>${lineAddBtn('pe_line')}</span></label>
     <label style="flex:1">Omborda (dona)<input id="pe_qty" type="number" min="0" step="1" value="${p.qty}" class="num"></label></div>
     <label>Kelish narxi (1 dona)<span class="row" style="flex-wrap:nowrap"><input id="pe_cost" type="number" min="0" step="any" value="${p.costUsd}" class="num" style="flex:1"><select id="pe_ccur" style="width:auto"><option value="usd" selected>$</option><option value="uzs">so'm</option></select></span></label>
     <label>Sotish narxi (1 dona)<span class="row" style="flex-wrap:nowrap"><input id="pe_sell" type="number" min="0" step="any" value="${cur==='uzs'?p.sellUzs:p.sellUsd}" class="num" style="flex:1"><select id="pe_scur" style="width:auto"><option value="usd" ${cur==='usd'?'selected':''}>$ (kurs bo'yicha)</option><option value="uzs" ${cur==='uzs'?'selected':''}>so'm (qat'iy)</option></select></span></label>
@@ -586,8 +592,9 @@ function vSozlamalar(){
   return `${owner()?`<section class="panel"><h2>Firma ma'lumotlari</h2><form id="compF" class="form">
     <label>Firma nomi<input id="c_name" required value="${esc(S.company.name)}"></label>
     <label>Qisqa izoh<input id="c_sub" value="${esc(S.company.sub)}"></label>
-    ${Object.keys(LINE_NAMES).map(k=>{const c=lineOf(k);return `<div class="full" style="display:grid;gap:8px;padding:12px;border:1px dashed var(--line);border-radius:10px">
-      <b style="font-size:14px">${LINE_NAMES[k]} <span class="muted small" style="font-weight:400">· ${k==='servis'?'remont talonida chiqadi':'shu yo\'nalishdagi etiketka va chekda chiqadi'}</span></b>
+    ${lineKeys().map(k=>{const c=lineOf(k), cu=!BASE_LINES.includes(k);return `<div class="full" style="display:grid;gap:8px;padding:12px;border:1px dashed var(--line);border-radius:10px">
+      <b style="font-size:14px">${esc(LINE_NAMES[k]||lineTitle(k))} <span class="muted small" style="font-weight:400">· ${k==='servis'?'remont talonida chiqadi':'shu bo\'limdagi etiketka va chekda chiqadi'}</span>${cu?` <button type="button" class="sm ghost" data-linedel="${k}" style="color:var(--bad,#e5484d)">Bo'limni o'chirish</button>`:''}</b>
+      ${cu?`<div class="form"><label>Bo'lim nomi<input id="c_${k}_title" value="${esc(c.title||'')}"></label></div>`:''}
       <div class="form"><label>Nomi (etiketka va chekda)<input id="c_${k}_brand" value="${esc(c.brand||'')}" placeholder="${esc(S.company.name)}"></label>
       <label>Telefon<input id="c_${k}_phone" value="${esc(c.phone)}" inputmode="tel"></label>
       <label>Telegram<input id="c_${k}_tg" value="${esc(c.telegram)}" placeholder="@kanal"></label>
@@ -615,7 +622,7 @@ function vSozlamalar(){
     <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" data-mod="discount" ${S.mods.discount!==false?'checked':''} style="width:auto"> Narx tushirib berish (chegirma)</label>
     <p class="small muted" style="margin:0">O'chirilgan modul hech kimga, xodimlarga ham ko'rinmaydi. Ma'lumotlar o'chmaydi.</p></div></section>
   <section class="panel"><h2>Narx tushirish chegarasi</h2><form id="discF" class="form">
-    ${Object.entries({noutbuk:'Noutbuklar',kompyuter:'Kompyuter / qismlar',servis:'Servis'}).map(([k,n])=>{const r=discRule(k); return `<label>${n} — 1 dona uchun ko'pi bilan<span class="row" style="flex-wrap:nowrap"><input id="ds_${k}" type="number" min="0" step="any" value="${r.v}" class="num" style="flex:1"><select id="dt_${k}" style="width:auto"><option value="pct" ${r.type==='pct'?'selected':''}>%</option><option value="uzs" ${r.type==='uzs'?'selected':''}>so'm</option><option value="usd" ${r.type==='usd'?'selected':''}>$</option></select></span></label>`;}).join('')}
+    ${lineKeys().map(k=>[k,{noutbuk:'Noutbuklar',kompyuter:'Kompyuter / qismlar',servis:'Servis'}[k]||lineTitle(k)]).map(([k,n])=>{const r=discRule(k); return `<label>${n} — 1 dona uchun ko'pi bilan<span class="row" style="flex-wrap:nowrap"><input id="ds_${k}" type="number" min="0" step="any" value="${r.v}" class="num" style="flex:1"><select id="dt_${k}" style="width:auto"><option value="pct" ${r.type==='pct'?'selected':''}>%</option><option value="uzs" ${r.type==='uzs'?'selected':''}>so'm</option><option value="usd" ${r.type==='usd'?'selected':''}>$</option></select></span></label>`;}).join('')}
     <div class="full row"><button class="pri">Saqlash</button><span class="small muted">Xodim savatda narxni shu miqdordan ortiq tushira olmaydi: foizda, so'mda yoki dollarda (0 — umuman tushira olmaydi). Rahbar uchun chegara yo'q. Har bir xodimga ruxsat "Xodimlar" → "Ruxsatlar"da beriladi.</span></div></form></section>
   <section class="panel"><h2>Soat sozlamasi</h2><form id="clkF" class="form">
     <label>Vaqt mintaqasi<select id="ck_tz">${TZS.map(([k,n])=>`<option value="${k}" ${k===CLK.tz?'selected':''}>${n}</option>`).join('')}</select></label>
@@ -826,7 +833,7 @@ function vQarz(){
     <datalist id="typeList">${[...new Set(S.debts.map(d=>d.type).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
     <label class="full">Shtrix-kod <span class="muted small">(kiritilsa — tovar darhol omborga kirim bo'ladi)</span><span class="row" style="flex-wrap:nowrap"><input id="d_bar" inputmode="numeric" placeholder="Skanerlang yoki bo'sh qoldiring"><button type="button" class="sm" data-cam="d_bar" title="Kamera bilan skanerlash">📷</button><button type="button" class="sm" data-genbar="d_bar" title="Shtrix-kodi yo'q tovar uchun">Yaratish</button></span></label>
     <label>Tovar nomi<input id="d_name" required placeholder="Kingston A400 240GB"></label>
-    <label>Yo'nalish<select id="d_line"><option value="noutbuk">Noutbuk</option><option value="kompyuter" selected>Kompyuter / qism</option><option value="servis">Servis</option></select></label>
+    <label>Bo'lim<span class="row" style="flex-wrap:nowrap"><select id="d_line" style="flex:1">${lineOptions('kompyuter')}</select>${lineAddBtn('d_line')}</span></label>
     <label>Soni<input id="d_qty" type="number" min="1" value="1" required class="num"></label>
     <label>Jami summa<input id="d_sum" type="number" min="0.01" step="0.01" required class="num"></label>
     <label>Valyuta<select id="d_cur"><option value="usd">Dollar ($)</option><option value="uzs">So'm</option></select></label>
@@ -948,7 +955,8 @@ function vBildirish(){
   </section>
   <section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Bildirishnomalar</h2>
     ${S.notifs.some(n=>!n.read)?'<button class="sm" id="notifAll">Hammasini o\'qildi</button>':''}</div>
-  ${S.notifs.map(n=>`<div style="border:1px solid var(--line,#ddd);border-left:4px solid ${n.level==='good'?'#2bb673':n.level==='bad'?'#e5484d':'#6ea6ee'};border-radius:10px;padding:10px 12px;margin-bottom:8px;${n.read?'opacity:.75':''}">
+  <div class="row" style="justify-content:flex-end;margin:0 0 6px"><button type="button" class="sm" data-torder="1">🕒 ${timeOrder==='desc'?'Yangisi tepada':'Eskisi tepada'} ⇅</button></div>
+  ${(timeOrder==='desc'?S.notifs:S.notifs.slice().reverse()).map(n=>`<div style="border:1px solid var(--line,#ddd);border-left:4px solid ${n.level==='good'?'#2bb673':n.level==='bad'?'#e5484d':'#6ea6ee'};border-radius:10px;padding:10px 12px;margin-bottom:8px;${n.read?'opacity:.75':''}">
     <div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b>${n.read?'':'● '}${esc(n.title)}</b><span class="small muted num" style="white-space:nowrap">${dts(n.ts)}</span></div>
     ${n.body?`<div class="small" style="white-space:pre-line;margin-top:4px">${esc(n.body)}</div>`:''}
     <div class="row" style="justify-content:flex-end;margin-top:6px">${n.read?'':`<button class="sm" data-nread="${n.id}">O'qildi</button>`}<button class="sm ghost" data-ndel="${n.id}">✕</button></div></div>`).join('')||'<p class="muted">Hozircha bildirishnoma yo\'q. Birinchisi bugun 21:05 da keladi.</p>'}
@@ -1064,10 +1072,32 @@ function sortVal(s){
   if(n) return [0,parseFloat(n[0].replace('−','-').replace(',','.'))];
   return [1,s.toLowerCase()];
 }
+// Vaqt bo'yicha tartib: barcha bo'limlarda "yangisi tepada" yoki "eskisi tepada"
+let timeOrder=(()=>{try{return localStorage.getItem('comtech_torder')||'desc'}catch{return 'desc'}})();
+function rowTimeKey(r){
+  const t=r.textContent||''; const d=t.match(/(\d{2})\.(\d{2})\.(\d{4})/), h=t.match(/(?:^|[^\d])(\d{2}):(\d{2})(?::(\d{2}))?(?!\d)/);
+  if(!d&&!h) return null;
+  return (d?d[3]+d[2]+d[1]:'00000000')+(h?h[1]+h[2]+(h[3]||'00'):'000000');
+}
+function applyTimeOrder(tbl){
+  const body=tbl.tBodies[0]; const rows=[...body.rows]; if(rows.length<2) return;
+  const keyed=rows.map((r,ix)=>({r,ix,k:rowTimeKey(r)}));
+  if(keyed.filter(x=>x.k).length<Math.max(2,rows.length*0.6)) return;
+  keyed.sort((a,b)=>{const x=a.k||'',y=b.k||''; const c=x<y?-1:x>y?1:0; return (timeOrder==='desc'?-c:c)||a.ix-b.ix;});
+  const f=document.createDocumentFragment(); keyed.forEach(o=>f.appendChild(o.r)); body.appendChild(f);
+}
 function enhanceTables(){
   document.querySelectorAll('#main table').forEach((tbl,i)=>{
     const head=tbl.tHead?.rows[0], body=tbl.tBodies[0]; if(!head||!body) return;
     const sec=tbl.closest('section'); const id=tab+'|'+(sec?.querySelector('h2')?.textContent.trim().slice(0,40)||'')+'|'+i;
+    const timed=[...body.rows].filter(r=>rowTimeKey(r)).length>=Math.max(1,body.rows.length*0.6);
+    const wrap=tbl.closest('.tbl')||tbl;
+    if(timed&&!wrap.previousElementSibling?.classList?.contains('tord')){
+      const bar=document.createElement('div'); bar.className='tord row'; bar.style.cssText='justify-content:flex-end;margin:0 0 6px';
+      bar.innerHTML=`<button type="button" class="sm" data-torder="1" title="Vaqt bo'yicha tartibni almashtirish">🕒 ${timeOrder==='desc'?'Yangisi tepada':'Eskisi tepada'} ⇅</button>`;
+      wrap.parentNode.insertBefore(bar,wrap);
+    }
+    if(timed&&!sortState[id]) applyTimeOrder(tbl);
     const ths=[...head.cells];
     ths.forEach((th,ci)=>{
       if(!th.textContent.trim()) return;
@@ -1396,7 +1426,7 @@ document.addEventListener('submit', async (e) => {
       closeModal();
     }
     if (id === 'compF') {
-      const lines = {}; for (const k of Object.keys(LINE_NAMES)) lines[k] = { brand: v(`c_${k}_brand`), phone: v(`c_${k}_phone`), telegram: v(`c_${k}_tg`), instagram: v(`c_${k}_ig`) };
+      const lines = {}; for (const k of lineKeys()) { const old = S.company.lines[k] || {}; lines[k] = { ...old, brand: v(`c_${k}_brand`), phone: v(`c_${k}_phone`), telegram: v(`c_${k}_tg`), instagram: v(`c_${k}_ig`) }; if (!BASE_LINES.includes(k)) lines[k].title = v(`c_${k}_title`) || old.title || k; }
       await act(() => settingsUpd({ company: { ...S.company, name: v('c_name'), sub: v('c_sub'), labelPrice: document.getElementById('c_lblprice').checked, lines } }), 'Firma ma\'lumotlari saqlandi');
     }
     if (id === 'prF') {
@@ -1442,6 +1472,20 @@ document.addEventListener('submit', async (e) => {
         await must(db.from('customer_debts').insert({ user_id: S.cur, client_phone: ph, client_name: nm, amount_uzs: +v('od_sum'), due_date: v('od_due') || null, note: v('od_note') }));
       }, 'Eski qarz kiritildi');
     }
+    if (id === 'lineAddF') {
+      const title = v('la_title'); if (!title) return toast("Bo'lim nomini yozing");
+      if (lineKeys().some((k) => lineTitle(k).toLowerCase() === title.toLowerCase())) return toast('Bunday bo\'lim bor');
+      const key = 'b' + Date.now().toString(36);
+      const lines = { ...S.company.lines, [key]: { title, brand: v('la_brand'), phone: v('la_phone'), telegram: v('la_tg'), instagram: v('la_ig'), custom: true } };
+      await act(() => settingsUpd({ company: { ...S.company, lines } }), `"${title}" bo'limi yaratildi`);
+      if (!S.company.lines[key]) S.company.lines = lines;
+      const ctx = lineAddCtx; lineAddCtx = null; closeModal();
+      if (ctx?.back) { document.getElementById('modalRoot').innerHTML = ctx.back; for (const [i, val] of ctx.form || []) { const el = i && document.getElementById(i); if (el) el.value = val; } }
+      for (const [i, val] of ctx?.main || []) { const el = document.getElementById(i); if (el && el.type !== 'file') el.value = val; }
+      const sel = ctx && document.getElementById(ctx.target);
+      if (sel) { sel.innerHTML = lineOptions(key); sel.value = key; }
+      return;
+    }
     if (id === 'peditF') {
       const pid = e.target.dataset.p || null, cc = v('pe_ccur'), sc = v('pe_scur'), cost = v('pe_cost'), sell = v('pe_sell');
       const body = { id: pid, name: v('pe_name').trim(), barcode: v('pe_bar').trim(), line: v('pe_line'), qty: Math.max(0, Math.round(+v('pe_qty') || 0)),
@@ -1467,7 +1511,7 @@ document.addEventListener('submit', async (e) => {
       await act(() => settingsUpd({ clock: { tz: v('ck_tz'), adj: Math.round(+v('ck_adj') || 0), sync: document.getElementById('ck_sync').checked } }), 'Soat sozlamasi saqlandi');
     }
     if (id === 'discF') {
-      const d = {}; for (const k of ['noutbuk', 'kompyuter', 'servis']) { const tp = v('dt_' + k), val = Math.max(0, +v('ds_' + k) || 0); d[k] = { type: tp, v: tp === 'pct' ? Math.min(100, val) : val }; }
+      const d = {}; for (const k of lineKeys()) { const tp = v('dt_' + k), val = Math.max(0, +v('ds_' + k) || 0); d[k] = { type: tp, v: tp === 'pct' ? Math.min(100, val) : val }; }
       await act(() => settingsUpd({ discount: d }), 'Narx tushirish chegarasi saqlandi');
     }
     if (id === 'credSetF') {
@@ -1633,6 +1677,33 @@ document.addEventListener('click', async (e) => {
     if (b.dataset.rold || b.dataset.rold2) {
       const r = S.repairs.find((x) => x.talon === +(b.dataset.rold || b.dataset.rold2));
       if (r) { if (b.dataset.rold) document.getElementById('re_phone').value = r.phoneOld; else document.getElementById('re_phone2').value = r.phoneOld; toast("Saqlash tugmasini bosing"); }
+    }
+    if (b.dataset.lineadd) {
+      const tgt = b.dataset.lineadd, sv = lineOf('servis');
+      const ov = document.getElementById('modalRoot').innerHTML.trim() ? document.getElementById('modalRoot').innerHTML : '';
+      lineAddCtx = { target: tgt, back: ov, form: ov ? [...document.querySelectorAll('#modalRoot input,#modalRoot select,#modalRoot textarea')].map((x) => [x.id, x.value]) : null,
+        main: [...document.querySelectorAll('#main input,#main select,#main textarea')].filter((x) => x.id).map((x) => [x.id, x.value]) };
+      modal(`<h3>Yangi bo'lim yaratish</h3><form id="lineAddF" style="display:grid;gap:10px">
+        <label>Bo'lim nomi<input id="la_title" required placeholder="Masalan: Monitorlar, Printerlar, Telefonlar"></label>
+        <label>Etiketka/chekdagi nom (brend)<input id="la_brand" value="${esc(sv.brand || S.company.name)}"></label>
+        <label>Telefon<input id="la_phone" value="${esc(sv.phone || '')}" inputmode="tel"></label>
+        <label>Telegram<input id="la_tg" value="${esc(sv.telegram || '')}"></label>
+        <label>Instagram<input id="la_ig" value="${esc(sv.instagram || '')}"></label>
+        <p class="small muted" style="margin:0">Telegram, Instagram va telefon COMPMIR (servis) bilan bir xil qo'yildi — xohlasangiz o'zgartiring. Keyin Sozlamalar → Firma ma'lumotlarida tahrirlanadi.</p>
+        <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Yaratish</button></div></form>`);
+      setTimeout(() => document.getElementById('la_title')?.focus(), 0);
+    }
+    if (b.dataset.linedel) {
+      const k = b.dataset.linedel, n = S.products.filter((p) => p.line === k).length;
+      if (n) return toast(`Bu bo'limda ${n} ta tovar bor — avval ularni boshqa bo'limga o'tkazing`);
+      const lines = { ...S.company.lines }; delete lines[k];
+      await act(() => settingsUpd({ company: { ...S.company, lines } }), "Bo'lim o'chirildi");
+    }
+    if (b.dataset.torder) {
+      timeOrder = timeOrder === 'desc' ? 'asc' : 'desc'; try { localStorage.setItem('comtech_torder', timeOrder); } catch {}
+      for (const k of Object.keys(sortState)) if (k.startsWith(tab + '|')) delete sortState[k];
+      try { sortSave(); } catch {}
+      keepScroll(render); toast(timeOrder === 'desc' ? 'Yangilari tepada' : 'Eskilari tepada');
     }
     if (b.dataset.pedit) productEditModal(b.dataset.pedit);
     if (b.dataset.pdel) modal(`<h3>Tovarni o'chirish</h3><p>${esc(S.products.find((p) => p.id === b.dataset.pdel)?.name || '')} butunlay o'chirilsinmi? Sotuvlar tarixida nomi saqlanib qoladi.</p><div class="row" style="justify-content:flex-end"><button type="button" data-close>Yo'q</button><button class="pri" data-pdelyes="${b.dataset.pdel}">Ha, o'chirish</button></div>`);
