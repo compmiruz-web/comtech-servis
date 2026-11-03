@@ -104,14 +104,16 @@ async function all(db: Db, table: string) {
 
 async function sendBackup(db: Db, s: any, day: string) {
   const tables = ['settings', 'profiles', 'staff_pay', 'products', 'product_costs', 'stock_moves', 'clients',
-    'repairs', 'sales', 'sale_items', 'sale_item_costs', 'expenses', 'supplier_debts', 'debt_payments', 'sale_returns', 'customer_debts', 'customer_payments'];
+    'repairs', 'sales', 'sale_items', 'sale_item_costs', 'expenses', 'supplier_debts', 'debt_payments', 'sale_returns', 'customer_debts', 'customer_payments', 'notifications'];
   const dump: Record<string, unknown[]> = {};
   for (const t of tables) dump[t] = await all(db, t);
   const body = JSON.stringify({ app: 'comtech-servis', version: 1, created: new Date().toISOString(), tables: dump });
   const form = new FormData();
   form.append('chat_id', String(s.tg.channel));
-  form.append('caption', `🗄 Baza zaxirasi · ${dmy(day)}\nTovarlar: ${dump.products.length} · Mijozlar: ${dump.clients.length} · Talonlar: ${dump.repairs.length} · Sotuvlar: ${dump.sales.length}`);
-  form.append('document', new Blob([body], { type: 'application/json' }), `comtech-baza-${day}.json`);
+  const NAMES: Record<string, string> = { products: 'Tovarlar', clients: 'Mijozlar', repairs: 'Talonlar', sales: 'Sotuvlar', sale_items: 'Sotuv qatorlari', expenses: 'Rasxodlar', stock_moves: 'Ombor harakatlari', supplier_debts: 'Tovar qarzlari', customer_debts: 'Nasiyalar', customer_payments: 'Nasiya to\'lovlari', sale_returns: 'Vazvratlar', profiles: 'Xodimlar' };
+  const total = Object.values(dump).reduce((a, r) => a + r.length, 0);
+  form.append('caption', (`🗄 Baza zaxirasi · ${dmy(day)} · jami ${total} yozuv\n` + Object.entries(NAMES).map(([k, n]) => `${n}: ${dump[k]?.length ?? 0}`).join(' · ')).slice(0, 1024));
+  form.append('document', new Blob([body], { type: 'application/json' }), `${s.company?.name || 'COMPMIR'}-baza-${day}.json`);
   await tgForm('sendDocument', form);
   try { await sendBackupExcel(s, day, dump); } catch (e) { console.error('excel', e); }
 }
