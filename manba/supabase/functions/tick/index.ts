@@ -27,6 +27,9 @@ Deno.serve(async (req) => {
       done.push('webhook');
     }
     if (!env('TG_BOT_TOKEN')) return json({ ok: true, day, hm, note: 'TG_BOT_TOKEN hali qo\'shilmagan' });
+    // Mijozlarga xabarlar birinchi: hisobot/zaxira xatosi ularni to'xtatib qo'ymasin
+    try { done.push(`notified:${await notifyReady(db, s)}`); } catch (e) { done.push('notify-err:' + e); }
+    try { done.push(`reminded:${await remindCredit(db, s, day)}`); } catch (e) { done.push('remind-err:' + e); }
     if (force === 'report' || (hm >= (s.tg.reportTime || '21:00') && s.last_report !== day)) {
       await sendReport(db, s, day);
       if (force !== 'report') await db.from('settings').update({ last_report: day }).eq('id', 1);
@@ -37,8 +40,6 @@ Deno.serve(async (req) => {
       if (force !== 'backup') await db.from('settings').update({ last_backup: day }).eq('id', 1);
       done.push('backup');
     }
-    done.push(`notified:${await notifyReady(db, s)}`);
-    done.push(`reminded:${await remindCredit(db, s, day)}`);
   } catch (e) {
     return json({ error: String(e), done }, 500);
   }
