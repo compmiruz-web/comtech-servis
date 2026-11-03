@@ -401,7 +401,7 @@ function addToCart(p){
 /* ---------- OMBOR ---------- */
 function vOmbor(){
   const q=oSearch.toLowerCase();
-  const list=S.products.filter(p=>!q||p.name.toLowerCase().includes(q)||p.barcode.includes(q));
+  const list=S.products.filter(p=>!q||p.name.toLowerCase().includes(q)||p.barcode.includes(q)).sort((a,b)=>(timeOrder==='desc'?(b.lastIn||0)-(a.lastIn||0):(a.lastIn||0)-(b.lastIn||0)));
   const stockVal=S.products.reduce((a,p)=>a+p.costUsd*p.qty,0);
   return `${canStock()?`<section class="panel"><h2>Kirim qilish</h2>
     <form id="kirimF" class="form">
@@ -418,8 +418,8 @@ function vOmbor(){
     <div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Tovarlar qoldig'i</h2>
     ${owner()?`<span class="chip">Ombor qiymati: <span class="num">${usd(stockVal)}</span></span>`:''}</div>
     <input id="oSearch" placeholder="Qidirish: nomi yoki shtrix-kod" value="${esc(oSearch)}" style="margin-bottom:10px">
-    <div class="tbl"><table><thead><tr><th>Nomi</th><th>Shtrix-kod</th><th class="r">Soni</th>${owner()?'<th class="r">Kelish $</th><th class="r">Sotish $</th>':''}<th class="r">Narxi (so'm)</th><th></th></tr></thead><tbody>
-    ${list.map(p=>`<tr><td>${esc(p.name)}<div><span class="chip" style="font-size:11px;padding:1px 8px;margin-top:3px">${esc(lineTitle(p.line||'kompyuter'))}</span></div></td><td class="num small">${esc(p.barcode)}</td>
+    <div class="tbl"><table><thead><tr><th>Kirim vaqti</th><th>Nomi</th><th>Shtrix-kod</th><th class="r">Soni</th>${owner()?'<th class="r">Kelish $</th><th class="r">Sotish $</th>':''}<th class="r">Narxi (so'm)</th><th></th></tr></thead><tbody>
+    ${list.map(p=>`<tr><td class="num small" style="white-space:nowrap">${dS(p.lastIn)}<br><span class="muted">${tS(p.lastIn)}</span></td><td>${esc(p.name)}<div><span class="chip" style="font-size:11px;padding:1px 8px;margin-top:3px">${esc(lineTitle(p.line||'kompyuter'))}</span></div></td><td class="num small">${esc(p.barcode)}</td>
     <td class="r">${p.qty<=2?`<span class="chip ${p.qty?'warn':'bad'} num">${p.qty}</span>`:`<span class="num">${p.qty}</span>`}</td>
     ${owner()?`<td class="r num">${usd(p.costUsd)}</td><td class="r num">${p.sellUzs?`<span title="So'mda qat'iy narx — kurs o'zgarsa ham o'zgarmaydi">${fmt(p.sellUzs)} so'm</span>`:usd(p.sellUsd)}</td>`:''}
     <td class="r num">${fmt(priceUzs(p))}<div class="small muted">${usd(usdP(p))}</div></td><td><div class="row" style="flex-wrap:nowrap">${owner()?`<button class="sm" data-pedit="${p.id}" title="Barcha parametrlarni o'zgartirish">✎</button>`:''}<button class="sm" data-label="${p.id}">Etiketka</button><button class="sm" data-stk="p${p.id}">Yopishtirgich</button></div></td></tr>`).join('')}
@@ -1212,7 +1212,7 @@ async function refresh() {
       canExpense: p.can_expense, seeSalary: p.see_salary, canDebt: p.can_debt, canReturn: p.can_return, canCredit: p.can_credit, canStock: p.can_stock, canDiscount: p.can_discount,
       oklad: +(payMap[p.id]?.oklad || 0), kpi: +(payMap[p.id]?.kpi || 0), kpiBase: payMap[p.id]?.kpi_base || 'foyda',
     })),
-    products: prods.map((p) => ({ id: p.id, name: p.name, barcode: p.barcode, line: p.line, qty: p.qty, sellUsd: +p.sell_usd, sellUzs: p.sell_uzs == null ? null : +p.sell_uzs, costUsd: costMap[p.id] ?? 0 })),
+    products: prods.map((p) => ({ id: p.id, name: p.name, barcode: p.barcode, line: p.line, qty: p.qty, sellUsd: +p.sell_usd, sellUzs: p.sell_uzs == null ? null : +p.sell_uzs, lastIn: ms(p.last_in || p.created_at), costUsd: costMap[p.id] ?? 0 })),
     clients: cls.map((c) => ({ phone: c.phone, name: c.name, tg: !!c.tg_chat_id })),
     repairs: reps.map((r) => ({
       talon: r.talon, ts: ms(r.created_at), phone: r.client_phone, phone2: r.client_phone2 || '', phoneOld: r.client_phone_old || '', name: r.client_name, device: r.device, model: r.model || '',
