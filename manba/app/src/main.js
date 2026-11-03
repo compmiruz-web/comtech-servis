@@ -42,7 +42,10 @@ const ICONS={
  bildirish:'<path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
  hisobot:'<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>',
  sozlamalar:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-2.7-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 2.7-1.1V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>'};
-const ROLES={owner:'Rahbar',usta:'Usta',sotuvchi:'Sotuvchi'};
+const ROLES={owner:'Rahbar',usta:'Usta',sotuvchi:'Sotuvchi',usta_sotuvchi:'Usta va sotuvchi'};
+const isUsta=u=>u.role==='usta'||u.role==='usta_sotuvchi';
+const isSeller=u=>u.role==='sotuvchi'||u.role==='usta_sotuvchi';
+const ROLE_OPTS=sel=>[['usta','Usta'],['sotuvchi','Sotuvchi'],['usta_sotuvchi','Usta va sotuvchi (ikkalasi ham)']].map(([k,n])=>`<option value="${k}" ${k===sel?'selected':''}>${n}</option>`).join('');
 const SKINS=[['yashil','Yashil',['#11704a','#e1f1e9','#eef2f0']],['kok',"Ko'k",['#1f5fae','#e2ebf7','#eef2f0']],['bordo','Bordo',['#9b2c3c','#f6e3e6','#eef2f0']],
  ['binafsha','Binafsha',['#5b3fa0','#ebe5f6','#eef2f0']],['grafit','Grafit (qora)',['#f0a830','#1b1e23','#121417']],['tun','Tun (qora)',['#4fd1c5','#121a30','#0b1020']]].slice(0,6);
 const CATS={qism:'Ehtiyot qism',transport:'Transport',ovqat:'Ovqat',kommunal:'Kommunal / internet',ijara:'Ijara',oylik:'Oylik / avans',boshqa:'Boshqa'};
@@ -61,7 +64,7 @@ const canStock=()=>owner()||(S.mods.stockin!==false&&me().canStock);
 const canDebt=()=>S.mods.debts!==false&&(owner()||me().canDebt);
 const monthOf=ts=>dayOf(ts).slice(0,7);
 function payroll(u){const p=S.payroll[u.id]||{};return {base:+p.base||0,kpiSum:+p.kpi_sum||0,total:+p.total||0,paid:+p.paid||0,left:+p.left_to_pay||0};}
-const kpiLabel=u=>u.role==='usta'?'topshirilgan remontlar summasidan':(u.kpiBase==='tushum'?'savdo tushumidan':'savdo foydasidan');
+const kpiLabel=u=>{const sv=u.kpiBase==='tushum'?'savdo tushumi':'savdo foydasi'; return u.role==='usta'?'topshirilgan remontlar summasidan':u.role==='usta_sotuvchi'?`remontlar summasi + ${sv}dan`:`${sv}dan`;};
 const C128=('212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 '+
 '221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 '+
 '231113 231311 112133 112331 132131 113123 113321 133121 313121 211331 231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 '+
@@ -481,7 +484,7 @@ function vUstaxona(){
       <label>Komplekt<input id="r_acc" placeholder="Zaryadka, sumka…"></label>
       <label class="full">Nosozlik sababi<textarea id="r_prob" required placeholder="Mijoz aytgan muammo"></textarea></label>
       <label>Taxminiy narx (so'm)<input id="r_fee" type="number" min="0" step="1000"></label>
-      <label>Usta<select id="r_master">${S.users.filter(u=>(u.role==='usta'||u.role==='owner')&&u.active).map(u=>`<option value="${u.id}" ${u.id===S.cur?'selected':''}>${esc(u.name)}${u.role==='owner'?' (o\'zim)':''}</option>`).join('')}</select></label>
+      <label>Usta<select id="r_master">${S.users.filter(u=>(isUsta(u)||u.role==='owner')&&u.active).map(u=>`<option value="${u.id}" ${u.id===S.cur?'selected':''}>${esc(u.name)}${u.role==='owner'?' (o\'zim)':''}</option>`).join('')}</select></label>
       <div class="full row"><button class="pri">Qabul qilish va talon chiqarish</button></div>
     </form></section>
   <section class="panel">
@@ -642,12 +645,13 @@ let viewUser=null;
 function userBlock(u){
   const t=today(), mon=t.slice(0,7);
   const head=`<div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="margin:0">${esc(u.name)} <span class="muted small">· ${ROLES[u.role]}</span></h2></div>`;
-  if(u.role==='usta'){
+  let ustaHtml='', sellHtml='';
+  if(isUsta(u)){
     const mine=S.repairs.filter(r=>r.masterId===u.id);
     const act=mine.filter(r=>r.status!=='berildi').reverse();
     const doneMon=mine.filter(r=>r.status==='berildi'&&r.doneTs&&dayOf(r.doneTs).startsWith(mon));
     const ready=mine.filter(r=>r.status==='tayyor').length;
-    return `<section class="panel">${head}<div class="stats">
+    ustaHtml=`<section class="panel">${head}<div class="stats">
       <div class="stat"><div class="k">Ishdagi qurilmalar</div><div class="v">${act.length}</div></div>
       <div class="stat"><div class="k">Tayyor, olib ketilmagan</div><div class="v">${ready}</div></div>
       <div class="stat"><div class="k">Shu oy topshirildi</div><div class="v">${doneMon.length}</div></div>
@@ -660,15 +664,17 @@ function userBlock(u){
       <td><button class="sm" data-talon="${r.talon}">Talon</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">Hozir ishda qurilma yo\'q</td></tr>'}
     </tbody></table></div></section>`;
   }
+  if(!isSeller(u)) return ustaHtml;
   const mine=S.sales.filter(s=>s.userId===u.id);
   const td=mine.filter(s=>dayOf(s.ts)===t), mo=mine.filter(s=>dayOf(s.ts).startsWith(mon));
   const sum=l=>l.reduce((a,s)=>a+s.totalUzs,0);
-  return `<section class="panel">${head}<div class="stats">
+  sellHtml=`<section class="panel">${ustaHtml?'<h2>Sotuvlar</h2>':head}<div class="stats">
     <div class="stat"><div class="k">Bugun sotuvlar</div><div class="v">${td.length}</div></div>
     <div class="stat"><div class="k">Bugun tushum</div><div class="v">${fmt(sum(td))}</div></div>
     <div class="stat"><div class="k">Shu oy sotuvlar</div><div class="v">${mo.length}</div></div>
     <div class="stat"><div class="k">Shu oy tushum</div><div class="v">${fmt(sum(mo))}</div></div></div></section>
   <section class="panel"><h2>Bugungi sotuvlarim</h2>${salesTable(td)}</section>`;
+  return ustaHtml+sellHtml;
 }
 function vMening(){
   if(me().role==='owner') return vXodimlar();
@@ -681,6 +687,7 @@ function vXodimlar(){
   <section class="panel"><h2>Xodimlar</h2>
   <div class="tbl"><table><thead><tr><th>Ism</th><th>Lavozim</th><th class="r">Bugun</th><th class="r">Shu oy</th><th>Login</th><th></th></tr></thead><tbody>
   ${S.users.map(u=>{const mon=today().slice(0,7);let a='—',b='—';
+    if(u.role==='usta_sotuvchi'){const m=S.repairs.filter(r=>r.masterId===u.id), sl=S.sales.filter(s=>s.userId===u.id);a=m.filter(r=>r.status!=='berildi').length+' ishda · '+fmt(sl.filter(s=>dayOf(s.ts)===today()).reduce((x,s)=>x+s.totalUzs,0));b=m.filter(r=>r.status==='berildi'&&r.doneTs&&dayOf(r.doneTs).startsWith(mon)).length+' top. · '+fmt(sl.filter(s=>dayOf(s.ts).startsWith(mon)).reduce((x,s)=>x+s.totalUzs,0));}
     if(u.role==='usta'){const m=S.repairs.filter(r=>r.masterId===u.id);a=m.filter(r=>r.status!=='berildi').length+' ishda';b=m.filter(r=>r.status==='berildi'&&r.doneTs&&dayOf(r.doneTs).startsWith(mon)).length+' topshirildi';}
     if(u.role==='sotuvchi'){const m=S.sales.filter(s=>s.userId===u.id);a=fmt(m.filter(s=>dayOf(s.ts)===today()).reduce((x,s)=>x+s.totalUzs,0));b=fmt(m.filter(s=>dayOf(s.ts).startsWith(mon)).reduce((x,s)=>x+s.totalUzs,0));}
     return `<tr><td class="who">${esc(u.name)}</td><td>${ROLES[u.role]}</td><td class="r num">${a}</td><td class="r num">${b}</td><td class="num">${esc(u.login||'')}${u.active?'':' <span class="chip bad" style="font-size:11px;padding:1px 8px">o\'chirilgan</span>'}</td>
@@ -708,7 +715,7 @@ function vXodimlar(){
   ${salaryHistory()}`:''}
   <section class="panel"><h2>Yangi xodim qo'shish</h2><form id="userF" class="form">
     <label>Ism<input id="u_name" required></label>
-    <label>Lavozim<select id="u_role"><option value="usta">Usta</option><option value="sotuvchi">Sotuvchi</option></select></label>
+    <label>Lavozim<select id="u_role">${ROLE_OPTS('usta')}</select></label>
     <label>Login (istalgan so'z)<input id="u_login" required maxlength="30" autocapitalize="none" placeholder="aziz"></label>
     <label>Parol (istalgan so'z yoki raqam)<input id="u_pin" required maxlength="30" autocapitalize="none" placeholder="masalan: 7 yoki ganiyev"></label>
     <div class="full row"><button class="pri">Qo'shish</button><span class="small muted">Xodim login va parol bilan kiradi, faqat o'z blokini ko'radi.</span></div>
@@ -1015,7 +1022,7 @@ function payModal(id){
   modal(`<h3>${esc(u.name)}: oylik sozlamasi</h3><form id="payF" data-u="${u.id}" style="display:grid;gap:10px">
   <label>Oklad (so'm/oy)<input id="p_oklad" type="number" min="0" step="10000" value="${u.oklad}" class="num"></label>
   <label>KPI foizi (%)<input id="p_kpi" type="number" min="0" max="100" step="0.5" value="${u.kpi}" class="num"></label>
-  ${u.role==='sotuvchi'?`<label>KPI qaysi summadan<select id="p_base"><option value="foyda" ${u.kpiBase==='foyda'?'selected':''}>Savdo foydasidan</option><option value="tushum" ${u.kpiBase==='tushum'?'selected':''}>Savdo tushumidan</option></select></label>`:'<p class="small muted" style="margin:0">Usta KPI: o\'zi topshirgan remontlar summasidan</p>'}
+  ${isSeller(u)?`<label>KPI qaysi summadan<select id="p_base"><option value="foyda" ${u.kpiBase==='foyda'?'selected':''}>Savdo foydasidan</option><option value="tushum" ${u.kpiBase==='tushum'?'selected':''}>Savdo tushumidan</option></select></label>`:'<p class="small muted" style="margin:0">Usta KPI: o\'zi topshirgan remontlar summasidan</p>'}
   <label>Hozir to'lash (avans/oylik, so'm)<input id="p_pay" type="number" min="0" step="10000" placeholder="Qoldiq: ${fmt(p.left)}" class="num"></label>
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div></form>`);
 }
@@ -1353,10 +1360,14 @@ document.addEventListener('submit', async (e) => {
       closeModal();
     }
     if (id === 'userF') {
-      await act(() => adminUsers({ action: 'create', name: v('u_name'), login: v('u_login'), role: v('u_role'), pin: v('u_pin') }), 'Xodim qo\'shildi');
+      const role = v('u_role');
+      await act(async () => { const r = await adminUsers({ action: 'create', name: v('u_name'), login: v('u_login'), role: role === 'usta_sotuvchi' ? 'sotuvchi' : role, pin: v('u_pin') });
+        if (role === 'usta_sotuvchi' && r?.id) await db.rpc('owner_set_role', { p_user: r.id, p_role: role }).then(must0); return r; }, 'Xodim qo\'shildi');
     }
     if (id === 'pinSetF') {
-      await act(() => adminUsers({ action: 'update', user_id: e.target.dataset.u, name: v('ps_name'), login: v('ps_login'), pin: v('ps_pin') }), 'Xodim ma\'lumotlari saqlandi');
+      const uid0 = e.target.dataset.u, oldRole = S.users.find((x) => x.id === uid0)?.role, newRole = v('ps_role');
+      await act(async () => { await adminUsers({ action: 'update', user_id: uid0, name: v('ps_name'), login: v('ps_login'), pin: v('ps_pin') });
+        if (newRole && newRole !== oldRole) await db.rpc('owner_set_role', { p_user: uid0, p_role: newRole }).then(must0); }, 'Xodim ma\'lumotlari saqlandi');
       closeModal();
     }
     if (id === 'expF') {
@@ -1673,6 +1684,7 @@ document.addEventListener('click', async (e) => {
       modal(`<h3>${esc(u.name)}: tahrirlash</h3><form id="pinSetF" data-u="${u.id}" style="display:grid;gap:10px">
         <label>Ism<input id="ps_name" required value="${esc(u.name)}"></label>
         <label>Login<input id="ps_login" required maxlength="30" autocapitalize="none" value="${esc(u.login || '')}"></label>
+        <label>Lavozim<select id="ps_role">${ROLE_OPTS(u.role)}</select></label>
         <label>Yangi parol (bo'sh qolsa, eskisi qoladi)<input id="ps_pin" maxlength="30" autocapitalize="none" placeholder="istalgan so'z yoki raqam"></label>
         <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div></form>`);
     }
