@@ -1,0 +1,9 @@
+const nm = [m.contact.first_name, m.contact.last_name].filter(Boolean).join(' ');
+        const { data: r, error } = await db.rpc('tg_link', { p_phone: m.contact.phone_number, p_chat: chat, p_name: nm });
+        if (error) throw error;
+        await tg('sendMessage', {
+          chat_id: chat, reply_markup: { remove_keyboard: true },
+          text: r?.found
+            ? `Rahmat, ${r.name}! Raqamingiz ulandi ✅ Qurilmangiz tayyor bo'lganda shu yerga xabar keladi.\nHolatni ko'rish: /holat`
+            : `Rahmat${nm ? ', ' + nm : ''}! Raqamingiz ro'yxatga olindi ✅ Servisga qurilma topshirganingizda holati shu yerga keladi.\nHolatni ko'rish: /holat`,
+        });

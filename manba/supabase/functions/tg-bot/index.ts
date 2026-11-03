@@ -24,15 +24,14 @@ Deno.serve(async (req) => {
       if (m.contact.user_id && m.contact.user_id !== m.from?.id) {
         await tg('sendMessage', { chat_id: chat, text: "Iltimos, o'zingizning raqamingizni tugma orqali yuboring." });
       } else {
-        const key = phoneKey(m.contact.phone_number);
-        const { data: list } = await db.from('clients').select('phone,name');
-        const mine = (list || []).filter((c) => phoneKey(c.phone) === key);
-        for (const c of mine) await db.from('clients').update({ tg_chat_id: chat }).eq('phone', c.phone);
+        const nm = [m.contact.first_name, m.contact.last_name].filter(Boolean).join(' ');
+        const { data: r, error } = await db.rpc('tg_link', { p_phone: m.contact.phone_number, p_chat: chat, p_name: nm });
+        if (error) throw error;
         await tg('sendMessage', {
           chat_id: chat, reply_markup: { remove_keyboard: true },
-          text: mine.length
-            ? `Rahmat, ${mine[0].name}! Raqamingiz ulandi. Qurilmangiz tayyor bo'lganda shu yerga xabar keladi.\nHolatni ko'rish: /holat`
-            : "Raqamingiz bazamizda topilmadi. Qurilmani topshirganda aytgan raqamingizdan yuboring yoki servisga murojaat qiling.",
+          text: r?.found
+            ? `Rahmat, ${r.name}! Raqamingiz ulandi ✅ Qurilmangiz tayyor bo'lganda shu yerga xabar keladi.\nHolatni ko'rish: /holat`
+            : `Rahmat${nm ? ', ' + nm : ''}! Raqamingiz ro'yxatga olindi ✅ Servisga qurilma topshirganingizda holati shu yerga keladi.\nHolatni ko'rish: /holat`,
         });
       }
     } else if (text.startsWith('/holat')) {
