@@ -309,7 +309,7 @@ function vSotuv(){
       ${canDisc()?`<div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap;align-items:center">
         <span class="small muted">Chegirma</span><input data-cd="${i}" type="number" min="0" step="any" value="${c.dv||''}" placeholder="0" class="num" style="width:90px;padding:4px 8px" aria-label="Chegirma miqdori">
         <select data-cu="${i}" style="width:auto;padding:4px 6px" aria-label="Chegirma birligi"><option value="pct" ${c.du==='pct'||!c.du?'selected':''}>%</option><option value="uzs" ${c.du==='uzs'?'selected':''}>so'm</option><option value="usd" ${c.du==='usd'?'selected':''}>$</option></select>
-        <span class="small muted">yoki narx</span><input data-cp="${i}" type="number" step="1000" min="${minPrice({...c,listUzs:lp})}" max="${lp}" value="${c.priceUzs}" class="num" style="width:120px;padding:4px 8px" aria-label="Narx (so'm)">
+        <span class="small muted">yoki narx</span><input data-cp="${i}" type="number" step="any" min="${minPrice({...c,listUzs:lp})}" max="${lp}" value="${c.priceUzs}" class="num" style="width:120px;padding:4px 8px" aria-label="Narx (so'm)">
         <span class="small muted" style="width:100%">${owner()?'Rahbar: chegarasiz':`Chegara: ${discLim(c.line)} · eng kam narx ${fmt(minPrice({...c,listUzs:lp}))} so'm`}</span></div>`:''}</td>
       <td class="r"><div class="row" style="justify-content:flex-end;flex-wrap:nowrap"><button class="sm ghost" data-q="${i}" data-d="-1">−</button><span class="num">${c.qty}</span><button class="sm ghost" data-q="${i}" data-d="1">+</button></div></td>
       <td class="r num">${fmt(c.priceUzs*c.qty)}</td><td><button class="sm ghost" data-rm="${i}" aria-label="O'chirish">✕</button></td></tr>`}).join('')}
@@ -341,7 +341,7 @@ function nasiyaFields(total){
       <label>Telefon<input id="ns_phone" required inputmode="tel" list="phonesN" value="${esc(nas.phone)}" placeholder="+998 90 123 45 67"></label>
       <datalist id="phonesN">${S.clients.map(c=>`<option value="${esc(c.phone)}">${esc(c.name)}</option>`).join('')}</datalist>
       <label>Ism<input id="ns_name" required value="${esc(nas.name)}"></label>
-      <label>Oldindan to'lov (so'm)<input id="ns_pre" type="number" min="0" step="1000" value="${esc(nas.prepaid)}" class="num" placeholder="0"></label>
+      <label>Oldindan to'lov (so'm)<input id="ns_pre" type="number" min="0" step="any" value="${esc(nas.prepaid)}" class="num" placeholder="0"></label>
       <label>To'lash muddati<input id="ns_due" type="date" value="${nas.due}" min="${today()}"></label>
       <label class="full">Izoh<input id="ns_note" value="${esc(nas.note)}" placeholder="pasport, kafil, kelishuv…"></label>
     </div>
@@ -410,8 +410,8 @@ function vOmbor(){
       <label>Bo'lim (etiketka uchun)<span class="row" style="flex-wrap:nowrap"><select id="k_line" style="flex:1">${lineOptions('kompyuter')}</select>${lineAddBtn('k_line')}</span></label>
       <label>Soni<input id="k_qty" type="number" min="1" value="1" required></label>
       <label>Narx valyutasi<select id="k_cur"><option value="usd" ${kCur==='usd'?'selected':''}>Dollarda ($)</option><option value="uzs" ${kCur==='uzs'?'selected':''}>So'mda</option></select></label>
-      <label><span id="k_costL">Kelish narxi (${kSym()})</span><input id="k_cost" type="number" step="${kCur==='uzs'?'1000':'0.01'}" min="0" ${owner()?'required':'placeholder="Mavjud tovarda bo\'sh qoldiring"'}></label>
-      <label><span id="k_sellL">Sotish narxi (${kSym()})</span><input id="k_sell" type="number" step="${kCur==='uzs'?'1000':'0.01'}" min="0" ${owner()?'required':'placeholder="Mavjud tovarda bo\'sh qoldiring"'}><span class="small muted" id="k_conv"></span></label>
+      <label><span id="k_costL">Kelish narxi (${kSym()})</span><input id="k_cost" type="number" step="any" min="0" ${owner()?'required':'placeholder="Mavjud tovarda bo\'sh qoldiring"'}></label>
+      <label><span id="k_sellL">Sotish narxi (${kSym()})</span><input id="k_sell" type="number" step="any" min="0" ${owner()?'required':'placeholder="Mavjud tovarda bo\'sh qoldiring"'}><span class="small muted" id="k_conv"></span></label>
       <div class="full row"><button class="pri">Omborga qo'shish</button><span class="small muted" id="k_hint">${owner()?"Bor shtrix-kod kiritilsa, soni qo'shiladi va narx yangilanadi.":"Bor tovar skanerlansa, faqat soni qo'shiladi; narxni bo'sh qoldirsangiz eski narx qoladi. Yangi tovarga ikkala narx shart."}</span></div>
     </form></section>`:''}
   <section class="panel">
@@ -466,7 +466,7 @@ function saleEditModal(id){
     ${sl.items.map(i=>`<form class="sitemF" data-i="${i.id}" style="display:grid;gap:6px;margin-bottom:10px">
       <b class="small">${esc(i.name)}</b>
       <div class="row" style="flex-wrap:nowrap;gap:8px"><label style="flex:1">Soni<input name="q" type="number" min="1" step="1" value="${i.qty}" class="num"></label>
-      <label style="flex:2">Narxi (1 dona, so'm)<input name="p" type="number" min="0" step="1000" value="${i.priceUzs}" class="num"></label>
+      <label style="flex:2">Narxi (1 dona, so'm)<input name="p" type="number" min="0" step="any" value="${i.priceUzs}" class="num"></label>
       <button class="sm pri" style="align-self:end">Saqlash</button></div></form>`).join('')}
     <p class="small muted" style="margin:0">Soni o'zgarsa ombordagi qoldiq ham o'zgaradi. Nasiyali sotuvda mijoz qarzi ham yangilanadi.</p>
     <div class="row" style="justify-content:space-between;margin-top:8px"><button type="button" class="ghost" data-sdel="${sl.id}" style="color:var(--bad,#e5484d)">Sotuvni bekor qilish</button><button type="button" data-close>Yopish</button></div>`);
@@ -490,7 +490,7 @@ function vUstaxona(){
       <label>Seriya raqami<input id="r_serial"></label>
       <label>Komplekt<input id="r_acc" placeholder="Zaryadka, sumka…"></label>
       <label class="full">Nosozlik sababi<textarea id="r_prob" required placeholder="Mijoz aytgan muammo"></textarea></label>
-      <label>Taxminiy narx (so'm)<input id="r_fee" type="number" min="0" step="1000"></label>
+      <label>Taxminiy narx (so'm)<input id="r_fee" type="number" min="0" step="any"></label>
       <label>Usta<select id="r_master">${S.users.filter(u=>(isUsta(u)||u.role==='owner')&&u.active).map(u=>`<option value="${u.id}" ${u.id===S.cur?'selected':''}>${esc(u.name)}${u.role==='owner'?' (o\'zim)':''}</option>`).join('')}</select></label>
       <div class="full row"><button class="pri">Qabul qilish va talon chiqarish</button></div>
     </form></section>
@@ -505,7 +505,7 @@ function vUstaxona(){
       <td>${esc(r.device)}${r.model?' · '+esc(r.model):''}<div class="small muted">${esc(r.problem)}</div><div class="small muted">Usta: ${esc(uName(r.masterId))}</div></td>
       <td><select data-st="${r.talon}" style="width:auto;padding:4px 8px" aria-label="Holati">${STATUSES.map(s=>`<option value="${s[0]}" ${s[0]===r.status?'selected':''}>${s[1]}</option>`).join('')}</select>
         <div style="margin-top:4px"><span class="status s-${r.status}">${stName(r.status)}</span></div></td>
-      <td class="r"><input data-fee="${r.talon}" type="number" step="1000" min="0" value="${r.feeUzs||''}" style="width:110px;text-align:right" class="num" aria-label="Narx"></td>
+      <td class="r"><input data-fee="${r.talon}" type="number" step="any" min="0" value="${r.feeUzs||''}" style="width:110px;text-align:right" class="num" aria-label="Narx"></td>
       <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-talon="${r.talon}">Talon</button><button class="sm" data-redit="${r.talon}">Tahrirlash</button><button class="sm" data-stk="r${r.talon}">Yopishtirgich</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">Topilmadi</td></tr>'}
     </tbody></table></div>
   </section>`;
@@ -778,13 +778,13 @@ function vNasiya(){
     <label>Telefon<input id="od_phone" required inputmode="tel" list="phonesO" placeholder="+998 90 123 45 67"></label>
     <datalist id="phonesO">${S.clients.map(c=>`<option value="${esc(c.phone)}">${esc(c.name)}</option>`).join('')}</datalist>
     <label>Ism<input id="od_name" required></label>
-    <label>Qarz summasi (so'm)<input id="od_sum" type="number" min="1" step="1000" required class="num"></label>
+    <label>Qarz summasi (so'm)<input id="od_sum" type="number" min="1" step="any" required class="num"></label>
     <label>To'lash muddati<input id="od_due" type="date"></label>
     <label class="full">Nima olgan / izoh<input id="od_note" placeholder="Masalan: HP noutbuk, 2026-10-15"></label>
     <div class="full row"><button class="pri">Qarzni kiritish</button></div></form></section>
   ${owner()?`<section class="panel"><h2>Nasiya sozlamalari</h2><form id="credSetF" class="form">
     <label>Odatiy muddat (kun)<input id="cs_days" type="number" min="1" max="365" value="${+(cr.days||30)}" class="num"></label>
-    <label>Bir mijozga qarz chegarasi (so'm, 0 = cheklovsiz)<input id="cs_limit" type="number" min="0" step="10000" value="${+(cr.limit||0)}" class="num"></label>
+    <label>Bir mijozga qarz chegarasi (so'm, 0 = cheklovsiz)<input id="cs_limit" type="number" min="0" step="any" value="${+(cr.limit||0)}" class="num"></label>
     <label>Muddatdan necha kun oldin eslatish<input id="cs_rem" type="number" min="0" max="30" value="${+(cr.remindDays??3)}" class="num"></label>
     <div class="full row"><button class="pri">Saqlash</button><span class="small muted">Chegara xodimlarga amal qiladi, rahbar oshira oladi. Eslatma mijozga Telegram yoki SMS orqali ketadi (bot ulangach).</span></div>
   </form></section>`:''}`;
@@ -796,7 +796,7 @@ function cpayModal(id){
   <p class="muted" style="margin:0">Qoldiq qarz: <b>${fmt(l)} so'm</b>${d.due?' · muddat '+dmy(d.due):''}</p>
   ${hist.length?`<div class="small">${hist.map(p=>`<div style="display:flex;justify-content:space-between"><span class="muted">${dts(p.ts)} · ${PAYN[p.pay]||p.pay}${p.note?' · '+esc(p.note):''}</span><span class="num">${fmt(p.amount)}</span></div>`).join('')}</div>`:''}
   <form id="cpayF" data-d="${d.id}" style="display:grid;gap:10px">
-    <label>Summa (so'm)<input id="cp_sum" type="number" min="1" step="1000" max="${l}" value="${l}" required class="num" style="font-size:20px"></label>
+    <label>Summa (so'm)<input id="cp_sum" type="number" min="1" step="any" max="${l}" value="${l}" required class="num" style="font-size:20px"></label>
     <label>To'lov turi<select id="cp_pay"><option value="naqd">Naqd</option><option value="karta">Karta</option><option value="otkazma">O'tkazma</option></select></label>
     <label>Izoh<input id="cp_note"></label>
     <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">To'lovni qabul qilish</button></div></form>`);
@@ -835,9 +835,9 @@ function vQarz(){
     <label>Tovar nomi<input id="d_name" required placeholder="Kingston A400 240GB"></label>
     <label>Bo'lim<span class="row" style="flex-wrap:nowrap"><select id="d_line" style="flex:1">${lineOptions('kompyuter')}</select>${lineAddBtn('d_line')}</span></label>
     <label>Soni<input id="d_qty" type="number" min="1" value="1" required class="num"></label>
-    <label>Jami summa<input id="d_sum" type="number" min="0.01" step="0.01" required class="num"></label>
+    <label>Jami summa<input id="d_sum" type="number" min="0.01" step="any" required class="num"></label>
     <label>Valyuta<select id="d_cur"><option value="usd">Dollar ($)</option><option value="uzs">So'm</option></select></label>
-    <label>Sotish narxi (1 dona, tanlangan valyutada)<input id="d_sell" type="number" min="0" step="0.01" class="num" placeholder="Shtrix-kod bo'lsa kerak"></label>
+    <label>Sotish narxi (1 dona, tanlangan valyutada)<input id="d_sell" type="number" min="0" step="any" class="num" placeholder="Shtrix-kod bo'lsa kerak"></label>
     <label>To'lash muddati<input id="d_due" type="date"></label>
     <label class="full">Izoh<input id="d_note" placeholder="ixtiyoriy"></label>
     <div class="full row"><button class="pri">Qarzni yozish</button><span class="small muted" id="d_hint">Shtrix-kod kiritilsa tovar omborga qo'shiladi va sotuvda skanerlanadi; sotilganda ombordan o'zi ayriladi.</span></div></form></section>
@@ -869,7 +869,7 @@ function payDebtModal(id){
   <p class="muted" style="margin:0">${esc(d.name)} × ${d.qty} · qoldiq <b>${money(left,d.cur)}</b></p>
   ${hist.length?`<div class="small">${hist.map(p=>`<div class="kv" style="display:flex;justify-content:space-between"><span class="muted">${dts(p.ts)}${p.note?' · '+esc(p.note):''}</span><span class="num">${money(p.amount,d.cur)}</span></div>`).join('')}</div>`:''}
   <form id="payDebtF" data-d="${d.id}" style="display:grid;gap:10px">
-    <label>To'lov summasi (${d.cur==='usd'?'$':"so'm"})<input id="pd_sum" type="number" min="0.01" step="0.01" max="${left}" value="${left}" required class="num"></label>
+    <label>To'lov summasi (${d.cur==='usd'?'$':"so'm"})<input id="pd_sum" type="number" min="0.01" step="any" max="${left}" value="${left}" required class="num"></label>
     <label>Izoh<input id="pd_note" placeholder="naqd, karta…"></label>
     <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">To'lash</button></div></form>`);
 }
@@ -887,7 +887,7 @@ function vRasxod(){
   const cats=Object.entries(CATS).filter(([k])=>owner()||k!=='oylik');
   return `<section class="panel"><h2>Rasxod kiritish</h2><form id="expF" class="form">
     <label>Turi<select id="e_cat">${cats.map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select></label>
-    <label>Summa (so'm)<input id="e_sum" type="number" min="1" step="1000" required class="num"></label>
+    <label>Summa (so'm)<input id="e_sum" type="number" min="1" step="any" required class="num"></label>
     ${owner()?`<label>Kimga (oylik uchun)<select id="e_to"><option value="">—</option>${S.users.filter(u=>u.role!=='owner').map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select></label>`:''}
     <label class="full">Izoh<input id="e_note" placeholder="Nima uchun"></label>
     <div class="full row"><button class="pri">Saqlash</button></div></form></section>
@@ -928,7 +928,7 @@ function salPayModal(id){
   const u=S.users.find(x=>x.id===id), p=payroll(u);
   modal(`<h3>${esc(u.name)}ga oylik berish</h3><form id="salF" data-u="${u.id}" style="display:grid;gap:10px">
   <p class="small muted" style="margin:0">Shu oy hisoblangan: ${fmt(p.total)} · berilgan: ${fmt(p.paid)} · qoldiq: <b>${fmt(p.left)}</b> so'm</p>
-  <label>Summa (so'm)<input id="sp_sum" type="number" min="1" step="1000" required value="${p.left>0?p.left:''}" class="num" style="font-size:20px"></label>
+  <label>Summa (so'm)<input id="sp_sum" type="number" min="1" step="any" required value="${p.left>0?p.left:''}" class="num" style="font-size:20px"></label>
   <div class="row" style="flex-wrap:nowrap"><label style="flex:1">Sana<input id="sp_date" type="date" required value="${today()}"></label><label style="flex:1">Vaqt<input id="sp_time" type="time" required value="${tS(Date.now()).slice(0,5)}"></label></div>
   <label>Turi<select id="sp_note"><option>Oylik</option><option>Avans</option><option>Bonus</option><option>KPI</option></select></label>
   <label>To'lov<select id="sp_pay"><option value="naqd">Naqd</option><option value="karta">Karta</option></select></label>
@@ -977,7 +977,7 @@ function kConv(){
 function setKCur(c){
   const prev=kCur; kCur=c; try{localStorage.setItem('comtech_kcur',c)}catch{}
   const sel=document.getElementById('k_cur'); if(sel) sel.value=c;
-  for(const id of ['k_cost','k_sell']){const i=document.getElementById(id); if(!i) continue; i.step=c==='uzs'?'1000':'0.01';
+  for(const id of ['k_cost','k_sell']){const i=document.getElementById(id); if(!i) continue; i.step='any';
     if(i.value!==''&&prev!==c) i.value=c==='uzs'?Math.round(+i.value*S.rate/1000)*1000:(+i.value/S.rate).toFixed(2);}
   const a=document.getElementById('k_costL'),b=document.getElementById('k_sellL'); if(a) a.textContent=`Kelish narxi (${kSym()})`; if(b) b.textContent=`Sotish narxi (${kSym()})`;
   kConv();
@@ -1037,10 +1037,10 @@ function showSugg(q){
 function payModal(id){
   const u=S.users.find(x=>x.id===id), p=payroll(u);
   modal(`<h3>${esc(u.name)}: oylik sozlamasi</h3><form id="payF" data-u="${u.id}" style="display:grid;gap:10px">
-  <label>Oklad (so'm/oy)<input id="p_oklad" type="number" min="0" step="10000" value="${u.oklad}" class="num"></label>
-  <label>KPI foizi (%)<input id="p_kpi" type="number" min="0" max="100" step="0.5" value="${u.kpi}" class="num"></label>
+  <label>Oklad (so'm/oy)<input id="p_oklad" type="number" min="0" step="any" value="${u.oklad}" class="num"></label>
+  <label>KPI foizi (%)<input id="p_kpi" type="number" min="0" max="100" step="any" value="${u.kpi}" class="num"></label>
   ${isSeller(u)?`<label>KPI qaysi summadan<select id="p_base"><option value="foyda" ${u.kpiBase==='foyda'?'selected':''}>Savdo foydasidan</option><option value="tushum" ${u.kpiBase==='tushum'?'selected':''}>Savdo tushumidan</option></select></label>`:'<p class="small muted" style="margin:0">Usta KPI: o\'zi topshirgan remontlar summasidan</p>'}
-  <label>Hozir to'lash (avans/oylik, so'm)<input id="p_pay" type="number" min="0" step="10000" placeholder="Qoldiq: ${fmt(p.left)}" class="num"></label>
+  <label>Hozir to'lash (avans/oylik, so'm)<input id="p_pay" type="number" min="0" step="any" placeholder="Qoldiq: ${fmt(p.left)}" class="num"></label>
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div></form>`);
 }
 
