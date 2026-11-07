@@ -1,7 +1,10 @@
 // Har 5 daqiqada pg_cron chaqiradi.
 // 1) reportTime bo'lganda guruhga kunlik hisobot (rasm + matn)
 // 2) backupTime bo'lganda kanalga butun baza (JSON fayl)
-// 3) "Tayyor" bo'lgan qurilmalar egalariga Telegram/SMS xabar
+// 3) "Tayyor" bo'lgan qurilmalar egalariga Telegram/SMS xabar ("Olib ketaman" tugmasi bilan)
+// 4) Kam qolgan tovarlar haqida guruhga ogohlantirish
+// 5) Yangi tovarlarni Telegram kanallarga joylash
+// 6) Dushanba kuni haftalik, oyning 1-kuni oylik tahlil
 import { admin, CATS, dmy, env, fmt, json, PAYS, phoneKey, tashkentNow, tg, tgForm } from '../_shared/common.ts';
 
 import * as XLSX from 'npm:xlsx@0.18.5';
@@ -22,7 +25,8 @@ Deno.serve(async (req) => {
     // Bot tokeni qo'shilgach, webhook o'zi ulanadi
     if (env('TG_BOT_TOKEN') && !s.webhook_ok) {
       const { data: secret } = await db.rpc('webhook_secret');
-      await tg('setWebhook', { url: `${env('SUPABASE_URL')}/functions/v1/tg-bot`, secret_token: secret, allowed_updates: ['message', 'channel_post'] });
+      await tg('setWebhook', { url: `${env('SUPABASE_URL')}/functions/v1/tg-bot`, secret_token: secret, allowed_updates: ['message', 'channel_post', 'callback_query'] });
+      await tg('setMyCommands', { commands: [{ command: 'holat', description: 'Qurilmalarim holati' }, { command: 'start', description: 'Raqamni ulash' }] }).catch(() => {});
       await db.from('settings').update({ webhook_ok: true }).eq('id', 1);
       done.push('webhook');
     }
@@ -30,6 +34,19 @@ Deno.serve(async (req) => {
     // Mijozlarga xabarlar birinchi: hisobot/zaxira xatosi ularni to'xtatib qo'ymasin
     try { done.push(`notified:${await notifyReady(db, s)}`); } catch (e) { done.push('notify-err:' + e); }
     try { done.push(`reminded:${await remindCredit(db, s, day)}`); } catch (e) { done.push('remind-err:' + e); }
+    try { done.push(`low:${await lowStock(db, s)}`); } catch (e) { done.push('low-err:' + e); }
+    try { done.push(`posted:${await channelPosts(db, s)}`); } catch (e) { done.push('post-err:' + e); }
+    const f = s.features || {};
+    const dow = new Date(`${day}T12:00:00Z`).getUTCDay();
+    if (force === 'weekly' || (f.weekly !== false && dow === 1 && hm >= '09:00' && s.last_weekly !== day)) {
+      try { await sendAnalytics(db, s, addDay(day, -7), addDay(day, -1), 'week'); done.push('weekly'); } catch (e) { done.push('weekly-err:' + e); }
+      if (force !== 'weekly') await db.from('settings').update({ last_weekly: day }).eq('id', 1);
+    }
+    const prevMonth = (() => { const d = new Date(`${day.slice(0, 7)}-01T12:00:00Z`); d.setUTCDate(0); return d.toISOString().slice(0, 7); })();
+    if (force === 'monthly' || (f.monthly !== false && day.endsWith('-01') && hm >= '09:00' && s.last_monthly !== prevMonth)) {
+      try { await sendAnalytics(db, s, `${prevMonth}-01`, addDay(`${day.slice(0, 7)}-01`, -1), 'month'); done.push('monthly'); } catch (e) { done.push('monthly-err:' + e); }
+      if (force !== 'monthly') await db.from('settings').update({ last_monthly: prevMonth }).eq('id', 1);
+    }
     if (force === 'report' || (hm >= (s.tg.reportTime || '21:00') && s.last_report !== day)) {
       await sendReport(db, s, day);
       if (force !== 'report') await db.from('settings').update({ last_report: day }).eq('id', 1);
@@ -59,6 +76,7 @@ async function sendReport(db: Db, s: any, day: string) {
     ...(Number(d.credit_overdue_count) ? [`⚠️ Muddati o'tgan nasiya: ${d.credit_overdue_count} ta · ${fmt(d.credit_overdue)} so'm`] : []),
     `🔧 Remont: qabul ${d.repairs_in} ta · topshirildi ${d.repairs_done} ta · ${fmt(d.repair_income)} so'm`,
     `💸 Rasxod: ${d.exp_count} ta · ${fmt(d.expenses)} so'm`,
+    ...(await vendDay(db, day)),
     ...Object.entries(d.by_cat || {}).map(([k, v]) => `    ${CATS[k] || k}: ${fmt(v)}`),
     '', `💰 Kassa qoldig'i: ${fmt(d.cash)} so'm`,
   ];
@@ -104,7 +122,8 @@ async function all(db: Db, table: string) {
 
 async function sendBackup(db: Db, s: any, day: string) {
   const tables = ['settings', 'profiles', 'staff_pay', 'products', 'product_costs', 'stock_moves', 'clients',
-    'repairs', 'sales', 'sale_items', 'sale_item_costs', 'expenses', 'supplier_debts', 'debt_payments', 'sale_returns', 'customer_debts', 'customer_payments', 'notifications'];
+    'repairs', 'sales', 'sale_items', 'sale_item_costs', 'expenses', 'supplier_debts', 'debt_payments', 'sale_returns', 'customer_debts', 'customer_payments', 'notifications',
+    'vend_devices', 'vend_income', 'channel_posts'];
   const dump: Record<string, unknown[]> = {};
   for (const t of tables) dump[t] = await all(db, t);
   const body = JSON.stringify({ app: 'comtech-servis', version: 1, created: new Date().toISOString(), tables: dump });
@@ -129,7 +148,8 @@ async function notifyReady(db: Db, s: any) {
       ` Olib ketishda talonni ko'rsating. Tel: ${line.phone || ''}`;
     let sent = false;
     const { data: cl } = await db.from('clients').select('tg_chat_id').eq('phone', r.client_phone).maybeSingle();
-    if (cl?.tg_chat_id) { try { await tg('sendMessage', { chat_id: cl.tg_chat_id, text }); sent = true; } catch { /* bot bloklangan bo'lishi mumkin */ } }
+    const btn = { inline_keyboard: [[{ text: '🚗 Olib ketaman', callback_data: `pick:${r.talon}` }, { text: "📞 Qo'ng'iroq qiling", callback_data: `call:${r.talon}` }]] };
+    if (cl?.tg_chat_id) { try { await tg('sendMessage', { chat_id: cl.tg_chat_id, text, reply_markup: btn }); sent = true; } catch { /* bot bloklangan bo'lishi mumkin */ } }
     if (await sms(r.client_phone, text)) sent = true;
     // Xabar ketmasa ham qayta-qayta urinmaslik uchun belgilaymiz
     await db.from('repairs').update({ notified_at: new Date().toISOString() }).eq('talon', r.talon);
@@ -248,4 +268,125 @@ async function sendBackupExcel(s: any, day: string, dump: Record<string, unknown
   form.append('caption', `🗄 Baza zaxirasi (Excel) · ${dmy(day)}`);
   form.append('document', new Blob([buf], { type: XLSX_MIME }), `${s.company?.name || 'COMPMIR'}-baza-${day}.xlsx`);
   await tgForm('sendDocument', form);
+}
+
+
+// ===== Yangi imkoniyatlar =====
+const addDay = (day: string, n: number) => { const d = new Date(`${day}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const lineName = (s: any, k: string) => ({ noutbuk: 'Noutbuklar', kompyuter: 'Kompyuter / qismlar', servis: 'Servis' } as Record<string, string>)[k] || s.company?.lines?.[k]?.title || k;
+
+async function vendDay(db: Db, day: string) {
+  try {
+    const [a, b] = uzRange(day);
+    const { data } = await db.from('vend_income').select('amount_uzs').gte('created_at', a).lt('created_at', b);
+    const sum = (data || []).reduce((x: number, r: any) => x + Number(r.amount_uzs), 0);
+    return sum ? [`🤖 Avtomatlar: ${data!.length} ta · ${fmt(sum)} so'm`] : [];
+  } catch { return []; }
+}
+
+async function lowStock(db: Db, s: any) {
+  const { data: list, error } = await db.rpc('low_stock_check');
+  if (error) throw error;
+  if (!list?.length || !s.tg?.group) return 0;
+  const text = `⚠️ Kam qolgan tovarlar — buyurtma qilish kerak (${list.length} ta):\n\n` +
+    list.slice(0, 40).map((x: any) => `• ${x.name} — ${x.qty} dona qoldi${x.barcode ? ` (${x.barcode})` : ''}`).join('\n') +
+    (list.length > 40 ? `\n… yana ${list.length - 40} ta` : '');
+  await tg('sendMessage', { chat_id: s.tg.group, text: text.slice(0, 4000) });
+  return list.length;
+}
+
+const chatOf = (c: string) => { c = String(c || '').trim(); if (!c) return ''; if (/^-?\d+$/.test(c) || c.startsWith('@')) return c; return '@' + c.replace(/^https?:\/\/t\.me\//, ''); };
+const warTxt = (w: any) => w && Number(w.n) > 0 ? `${Number(w.n)} ${({ kun: 'kun', oy: 'oy', yil: 'yil' } as Record<string, string>)[w.u] || 'oy'}` : '';
+
+async function channelPosts(db: Db, s: any) {
+  const f = s.features || {};
+  const cutoff = new Date(Date.now() - 10 * 60000).toISOString(); // avtomatik joylashdan oldin 10 daqiqa: rasm va narxni qo'shib ulgurish uchun
+  const { data: q, error } = await db.from('channel_posts').select('id, manual, created_at, product_id, products(*)')
+    .is('posted_at', null).is('error', null).order('created_at').limit(8);
+  if (error) throw error;
+  let n = 0;
+  for (const it of q || []) {
+    if (!it.manual && it.created_at > cutoff) continue;
+    const p: any = Array.isArray(it.products) ? it.products[0] : it.products;
+    try {
+      if (!p) throw new Error('tovar o\'chirilgan');
+      const chat = chatOf(f.channels?.[p.line]);
+      if (!chat) throw new Error('bo\'lim uchun kanal yozilmagan');
+      if (!it.manual && p.qty <= 0) throw new Error('omborda qolmagan');
+      const price = p.sell_uzs ? Number(p.sell_uzs) : Math.ceil(Number(p.sell_usd) * Number(s.rate) / 1000) * 1000;
+      const ln = s.company?.lines?.[p.line] || {}, w = warTxt(p.warranty || f.warranty?.[p.line]);
+      const parts = String(p.name).split('|').map((x) => x.trim()).filter(Boolean);
+      const caption = [
+        `🆕 ${parts[0]}`, ...parts.slice(1).map((x) => `▫️ ${x}`), '',
+        `💰 Narxi: ${fmt(price)} so'm`, ...(w ? [`🛡 Kafolat: ${w}`] : []), ...(p.qty > 1 ? [`📦 Mavjud: ${p.qty} dona`] : []), '',
+        ...(ln.phone ? [`📞 ${ln.phone}`] : []), [ln.telegram && `✈️ ${ln.telegram}`, ln.instagram && `📷 ${ln.instagram}`].filter(Boolean).join(' · '),
+      ].filter((x, i, a) => !(x === '' && a[i - 1] === '')).join('\n').trim();
+      const msg = p.photo
+        ? await tg('sendPhoto', { chat_id: chat, photo: p.photo, caption: caption.slice(0, 1024) })
+        : await tg('sendMessage', { chat_id: chat, text: caption.slice(0, 4000) });
+      await db.from('channel_posts').update({ posted_at: new Date().toISOString(), message_id: msg?.message_id || null }).eq('id', it.id);
+      n++;
+    } catch (e) {
+      const m = String((e as Error)?.message || e);
+      await db.from('channel_posts').update({ error: m.slice(0, 300) }).eq('id', it.id);
+      if (it.manual && s.tg?.group) {
+        await tg('sendMessage', { chat_id: s.tg.group, text: `❗️ Kanalga joylab bo'lmadi: ${p?.name || ''}\n${m}\n\nBot kanalga admin qilib qo'shilganini tekshiring.` }).catch(() => {});
+      }
+    }
+  }
+  return n;
+}
+
+async function sendAnalytics(db: Db, s: any, from: string, to: string, kind: 'week' | 'month') {
+  const { data: a, error } = await db.rpc('analytics', { p_from: from, p_to: to });
+  if (error) throw error;
+  const t = a.totals || {}, name = s.company?.name || 'COMPMIR';
+  const MON = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
+  const title = kind === 'week' ? `haftalik tahlil · ${dmy(from)}–${dmy(to)}` : `oylik tahlil · ${MON[Number(from.slice(5, 7)) - 1]} ${from.slice(0, 4)}`;
+  const medal = (i: number) => ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
+  const base = [
+    `📈 ${name} · ${title}`, '',
+    `🛒 Sotuv: ${t.sales || 0} ta chek · ${fmt(t.revenue)} so'm`,
+    `🔧 Remont: ${(a.masters || []).reduce((x: number, m: any) => x + Number(m.cnt), 0)} ta topshirildi · ${fmt(t.repair)} so'm (qabul: ${a.repairs_in} ta)`,
+    ...(Number(t.vend) ? [`🤖 Avtomatlar: ${fmt(t.vend)} so'm`] : []),
+    `💸 Rasxod: ${fmt(t.expenses)} so'm`,
+  ];
+  const profitLines = [`📊 Savdo foydasi: ${fmt(t.profit)} so'm`, `💰 Sof foyda: ${fmt(t.net)} so'm`];
+  const rest = [
+    ...(a.top?.length ? ['', '🏆 Eng ko\'p sotilgan:', ...a.top.slice(0, 5).map((x: any, i: number) => `${medal(i)} ${String(x.name).split('|')[0].trim()} — ${x.qty} dona`)] : []),
+    ...(a.lines?.length ? ['', '🏬 Bo\'limlar:', ...a.lines.map((x: any) => `• ${lineName(s, x.line)}: ${fmt(x.revenue)} so'm`)] : []),
+    ...(a.sellers?.length ? ['', '👤 Sotuvchilar:', ...a.sellers.map((x: any, i: number) => `${medal(i)} ${x.name || '—'} — ${fmt(x.revenue)} so'm (${x.sales} ta)`)] : []),
+    ...(a.masters?.length ? ['', '🔧 Ustalar:', ...a.masters.map((x: any, i: number) => `${medal(i)} ${x.name} — ${x.cnt} ta · ${fmt(x.income)} so'm`)] : []),
+  ];
+  const groupText = [...base, ...(s.tg?.profit ? profitLines : []), ...rest].join('\n');
+  const days = a.days || [];
+  const chart = {
+    type: 'bar',
+    data: {
+      labels: days.map((d: any) => kind === 'week' ? ['Du', 'Se', 'Cho', 'Pa', 'Ju', 'Sha', 'Ya'][(new Date(`${d.d}T12:00:00Z`).getUTCDay() + 6) % 7] : String(d.d).slice(8, 10)),
+      datasets: [
+        { label: 'Sotuv', data: days.map((d: any) => Number(d.revenue)), backgroundColor: '#2bb673' },
+        { label: 'Remont', data: days.map((d: any) => Number(d.repair)), backgroundColor: '#6ea6ee' },
+        { label: 'Rasxod', data: days.map((d: any) => Number(d.expenses)), backgroundColor: '#f07d81' },
+      ],
+    },
+    options: {
+      title: { display: true, text: `${name} · ${title}`, fontColor: '#ffffff', fontSize: 18 },
+      legend: { labels: { fontColor: '#ffffff' } },
+      scales: { xAxes: [{ ticks: { fontColor: '#cfd8d3' }, gridLines: { display: false } }], yAxes: [{ ticks: { beginAtZero: true, fontColor: '#cfd8d3' }, gridLines: { color: 'rgba(255,255,255,.08)' } }] },
+    },
+  };
+  const photo = 'https://quickchart.io/chart?w=1000&h=520&bkg=%230d1411&c=' + encodeURIComponent(JSON.stringify(chart));
+  if (s.tg?.group) {
+    try {
+      if (groupText.length <= 1024) await tg('sendPhoto', { chat_id: s.tg.group, photo, caption: groupText });
+      else { await tg('sendPhoto', { chat_id: s.tg.group, photo }); await tg('sendMessage', { chat_id: s.tg.group, text: groupText.slice(0, 4000) }); }
+    } catch { await tg('sendMessage', { chat_id: s.tg.group, text: groupText.slice(0, 4000) }); }
+  }
+  // Rahbarga dasturda (foyda bilan)
+  await db.from('notifications').insert({
+    kind: kind === 'week' ? 'week' : 'month', level: Number(t.net) >= 0 ? 'good' : 'bad',
+    title: `${kind === 'week' ? 'Haftalik' : 'Oylik'} tahlil: sof foyda ${fmt(t.net)} so'm`,
+    body: [...base.slice(2), ...profitLines, ...rest].join('\n'), ref: `${kind}-${from}`,
+  }).then(() => {}, () => {});
 }
