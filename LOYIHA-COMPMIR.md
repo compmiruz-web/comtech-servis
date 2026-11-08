@@ -46,6 +46,7 @@
 ### 2026-11-08 (2) — Ustaxona nazorati
 - Guruhga so'rov: "Qabul qilindi"dagi har talon bo'yicha "🔍 Diagnostika qildingizmi?" (tugmalar: Diagnostika qilinyapti / Ta'mirga o'tdi / 1 soatdan keyin so'ra). Javob bo'lmasa **har 30 daqiqada** qayta (eski xabar o'chib, yangisi pastga tushadi, "N-marta so'ralyapti" yoziladi)
 - "Diagnostikada" 2 soatdan oshsa: "Natijasi qanday?" (Ta'mirga o'tdi / Tayyor — narx yozilmagan bo'lsa Tayyor qilmaydi)
+- Alohida so'rov faqat oxirgi 7 kunda qabul qilingan talonlarga; eskilari (holati yangilanmagan) kuniga bir marta bitta umumiy xabarda
 - Faqat ish vaqtida (odatiy 09:00–20:00), Sozlamalar → Avtomatik xabarlar va kanallar'da yoqish/o'chirish va vaqt
 - Dasturda Ustaxona ro'yxati muddatga qarab rangda: 1 kun sariq, 3 kun to'q sariq, 5 kun qizil, 8+ kun qizil miltillaydi; tepada "⚠️ Ustaxona nazorati" paneli
 

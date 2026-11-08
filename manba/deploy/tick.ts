@@ -479,6 +479,28 @@ function askButtons(talon: number, status: string) {
   return { inline_keyboard: [row1, [{ text: '⏳ 1 soatdan keyin so\'ra', callback_data: `dq:snooze:${talon}` }]] };
 }
 
+// N kundan eski, holati yangilanmagan talonlar — kuniga bir marta bitta umumiy xabar
+async function staleSummary(db: Db, s: any, days: number) {
+  const { day } = tashkentNow();
+  if (s.features?.lastStale === day) return;
+  const { data: old, error } = await db.from('repairs').select('talon,created_at,status')
+    .in('status', ['qabul', 'diag', 'tamir']).lt('created_at', new Date(Date.now() - days * 864e5).toISOString()).order('talon');
+  if (error) throw error;
+  await db.from('settings').update({ features: { ...(s.features || {}), lastStale: day } }).eq('id', 1);
+  s.features = { ...(s.features || {}), lastStale: day };
+  if (!old?.length) return;
+  const cnt: Record<string, number> = {};
+  for (const r of old) cnt[r.status] = (cnt[r.status] || 0) + 1;
+  const NM: Record<string, string> = { qabul: 'Qabul qilindi', diag: 'Diagnostikada', tamir: "Ta'mirda" };
+  const nums = old.slice(0, 60).map((r: any) => `№${r.talon}`).join(', ') + (old.length > 60 ? ` … yana ${old.length - 60} ta` : '');
+  await tg('sendMessage', { chat_id: s.tg.group, text: [
+    `🕰 ${days} kundan ortiq turgan, holati yangilanmagan talonlar: ${old.length} ta`,
+    Object.entries(cnt).map(([k, v]) => `• ${NM[k] || k}: ${v} ta`).join('\n'), '',
+    nums, '',
+    "Iltimos, dasturda holatini yangilang (topshirilgan bo'lsa — \"Topshirildi\"). Bu xabar kuniga bir marta keladi.",
+  ].join('\n').slice(0, 4000) });
+}
+
 async function askRepairs(db: Db, s: any, hm: string, force: boolean) {
   const f = s.features || {};
   if (f.diagAsk === false || !s.tg?.group) return 0;
@@ -486,12 +508,16 @@ async function askRepairs(db: Db, s: any, hm: string, force: boolean) {
   if (!s.features?.diagAskHello) {
     // Birinchi ishga tushganda guruhga tekshiruv xabari (bot guruhga yoza olishini ko'rsatadi)
     await tg('sendMessage', { chat_id: s.tg.group, text: `✅ Ustaxona nazorati yoqildi.\n\nQabul qilingan qurilmalar bo'yicha shu guruhga "Diagnostika qildingizmi?" deb so'rayman. Javob berilmasa har ${ASK_EVERY_MIN} daqiqada qayta so'rayman (ish vaqti: ${from}–${to}).` });
-    await db.from('settings').update({ features: { ...(s.features || {}), diagAskHello: true } }).eq('id', 1);
+    s.features = { ...(s.features || {}), diagAskHello: true };
+    await db.from('settings').update({ features: s.features }).eq('id', 1);
   }
   if (!force && (hm < from || hm >= to)) return 0;
   let q = db.from('repairs').select('talon,created_at,status_at,status,client_name,device,model,problem,master_id,ask_msg_id,ask_count')
     .in('status', ['qabul', 'diag']).not('ask_next_at', 'is', null).order('talon').limit(15);
+  const days = Number(f.askDays) || 7; // faqat oxirgi N kunda qabul qilinganlar alohida so'raladi
+  q = q.gte('created_at', new Date(Date.now() - days * 864e5).toISOString());
   if (!force) q = q.lte('ask_next_at', new Date().toISOString());
+  try { await staleSummary(db, s, days); } catch (e) { console.error('stale', e); }
   const { data: list, error } = await q;
   if (error) throw error;
   if (!list?.length) return 0;
