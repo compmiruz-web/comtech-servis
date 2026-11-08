@@ -133,7 +133,13 @@ Deno.serve(async (req) => {
         await tg('answerCallbackQuery', { callback_query_id: cq.id, text: "1 soatdan keyin yana so'rayman" });
         await done(`⏳ ${who} (${now}): 1 soatdan keyin so'raladi`);
       } else if (act === 'tayyor' && !Number(r.fee_uzs)) {
-        await tg('answerCallbackQuery', { callback_query_id: cq.id, show_alert: true, text: "Avval dasturda narxini yozing, keyin \"Tayyor\" qiling — mijozga narx bilan xabar boradi." });
+        // Narx yozilmagan: guruhda narxni so'raymiz (shu xabarga javob qilib yoziladi)
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Narxini yozing 👇' });
+        await tg('sendMessage', {
+          chat_id: chat, reply_to_message_id: cq.message.message_id,
+          text: `💰 №${talon} ta'mir narxini yozing (so'm), masalan: 150000\nBepul bo'lsa 0 yozing. Narx yozilgach "Tayyor" bo'ladi va mijozga xabar ketadi.`,
+          reply_markup: { force_reply: true, selective: false, input_field_placeholder: `№${talon} narxi, so'm` },
+        });
       } else if (['diag', 'tamir', 'tayyor'].includes(act)) {
         await db.from('repairs').update({ status: act, ask_msg_id: null, ...(act === 'tayyor' ? { notified_at: null } : {}) }).eq('talon', talon);
         await tg('answerCallbackQuery', { callback_query_id: cq.id, text: `№${talon}: ${ST[act]} ✅` });
@@ -192,6 +198,27 @@ Deno.serve(async (req) => {
   try {
     if (text.startsWith('/id')) {
       await tg('sendMessage', { chat_id: chat, text: `Bu chat ID: ${chat}\nUni dasturdagi Sozlamalar → Telegram bo'limiga yozing.` });
+    } else if (m.chat.type !== 'private' && m.reply_to_message?.from?.is_bot && /№(\d+) ta'mir narxini yozing/.test(m.reply_to_message.text || '')) {
+      // Guruhda "Tayyor" uchun narx javobi
+      const s = await settings(db);
+      if (String(chat) === String(s.tg?.group)) {
+        const talon = Number((m.reply_to_message.text.match(/№(\d+)/) || [])[1]);
+        const raw = text.replace(/[\s,.']/g, '').toLowerCase();
+        const k = /(ming|k)$/.test(raw) ? 1000 : 1;
+        const fee = Number(raw.replace(/(ming|k|so'?m|sum)$/g, '').replace(/\D/g, '')) * k;
+        const { data: r } = await db.from('repairs').select('talon,status').eq('talon', talon).maybeSingle();
+        const who = [m.from?.first_name, m.from?.last_name].filter(Boolean).join(' ') || 'xodim';
+        if (!r) {
+          await tg('sendMessage', { chat_id: chat, reply_to_message_id: m.message_id, text: `№${talon} talon topilmadi.` });
+        } else if (['tayyor', 'berildi'].includes(r.status)) {
+          await tg('sendMessage', { chat_id: chat, reply_to_message_id: m.message_id, text: `№${talon} allaqachon: ${ST[r.status]}` });
+        } else if (!/\d/.test(text) || !Number.isFinite(fee)) {
+          await tg('sendMessage', { chat_id: chat, reply_to_message_id: m.message_id, text: `Narxni raqam bilan yozing, masalan: 150000. Iltimos, yuqoridagi so'rovga javob qilib qayta yozing.` });
+        } else {
+          await db.from('repairs').update({ fee_uzs: fee, status: 'tayyor', notified_at: null, ask_msg_id: null }).eq('talon', talon);
+          await tg('sendMessage', { chat_id: chat, reply_to_message_id: m.message_id, text: `✅ №${talon} tayyor · ${fmt(fee)} so'm (${who}). Mijozga 5 daqiqa ichida xabar ketadi.` });
+        }
+      }
     } else if (m.chat.type !== 'private') {
       // guruhlarda boshqa buyruqlarga javob bermaymiz
     } else if (m.contact) {

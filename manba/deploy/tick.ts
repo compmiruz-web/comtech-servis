@@ -475,8 +475,8 @@ const ageTxt = (t: string) => {
 function askButtons(talon: number, status: string) {
   const row1 = status === 'qabul'
     ? [{ text: '🔍 Diagnostika qilinyapti', callback_data: `dq:diag:${talon}` }, { text: "🔧 Ta'mirga o'tdi", callback_data: `dq:tamir:${talon}` }]
-    : [{ text: "🔧 Ta'mirga o'tdi", callback_data: `dq:tamir:${talon}` }, { text: '✅ Tayyor', callback_data: `dq:tayyor:${talon}` }];
-  return { inline_keyboard: [row1, [{ text: '⏳ 1 soatdan keyin so\'ra', callback_data: `dq:snooze:${talon}` }]] };
+    : [{ text: "🔧 Ta'mirga o'tdi", callback_data: `dq:tamir:${talon}` }];
+  return { inline_keyboard: [row1, [{ text: '✅ Tayyor', callback_data: `dq:tayyor:${talon}` }, { text: '⏳ 1 soatdan keyin so\'ra', callback_data: `dq:snooze:${talon}` }]] };
 }
 
 // N kundan eski, holati yangilanmagan talonlar — kuniga bir marta bitta umumiy xabar
