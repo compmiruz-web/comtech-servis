@@ -635,7 +635,7 @@ function vSozlamalar(){
     <label>Tuzatish (daqiqa, + oldinga / − orqaga)<span class="row" style="flex-wrap:nowrap"><button type="button" class="sm" data-ckadj="-60">−1 soat</button><button type="button" class="sm" data-ckadj="-1">−1</button><input id="ck_adj" type="number" step="1" value="${+CLK.adj||0}" class="num" style="width:90px"><button type="button" class="sm" data-ckadj="1">+1</button><button type="button" class="sm" data-ckadj="60">+1 soat</button></span></label>
     <label class="full row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" id="ck_sync" ${CLK.sync?'checked':''} style="width:auto"> Server vaqti bilan moslash (telefon soati noto'g'ri bo'lsa ham to'g'ri ko'rsatadi)</label>
     <div class="full row"><button class="pri">Saqlash</button><span class="small muted">Hozir: <b class="num" id="ckPrev">${dts(nowFix())}</b> · telefon soati bilan farq: <span class="num">${Math.round(CLK.skew/1000)}</span> soniya</span></div></form></section>`:''}
-  ${owner()?featPanel()+vendPanel():''}
+  ${owner()?featPanel():''}
   ${owner()?`<section class="panel"><h2>Printerlar</h2><form id="prF" class="form">
     <label>Chek va talon printeri<input id="pr_r" value="${esc(S.printers.receipt)}"></label>
     <label>Chek qog'ozi eni (mm)<input id="pr_w" type="number" min="40" max="120" value="${esc(S.printers.receiptW)}" class="num" list="rwl"></label>
@@ -1167,61 +1167,6 @@ function pExtraModal(id){
     ${last?`<p class="small muted full" style="margin:0">Kanalga oxirgi joylash: ${last.postedTs?dts(last.postedTs)+' ✅':last.error?'❌ '+esc(last.error):'navbatda — 5 daqiqa ichida joylanadi'}</p>`:''}</form>`);
 }
 
-/* Avtomatlar (Mecanuz) */
-function vendCode(dev,tok){const c=getCfg()||{};
-  return `// ${S.company.name} · ${dev} avtomati — pul qabul qilinganda dasturga yozish (ESP32, Arduino)
-#include <WiFi.h>
-#include <WiFiClientSecure.h>
-#include <HTTPClient.h>
-
-const char* API_URL = "${c.url||'https://...supabase.co'}/rest/v1/rpc/vend_add";
-const char* API_KEY = "${c.key||'ANON_KEY'}";
-const char* DEV_ID  = "${dev}";
-const char* DEV_TOK = "${tok||'KALIT'}";
-
-uint32_t bootId = 0, seq = 0;
-
-// amount — so'mda (masalan 5000). extId — har bir to'lov uchun noyob;
-// yuborilmasa, xuddi shu extId bilan qayta yuboring (ikki marta yozilmaydi).
-bool sendIncome(long amount, const String& extId) {
-  if (WiFi.status() != WL_CONNECTED) return false;
-  WiFiClientSecure cl; cl.setInsecure();
-  HTTPClient http;
-  if (!http.begin(cl, API_URL)) return false;
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("apikey", API_KEY);
-  http.addHeader("Authorization", String("Bearer ") + API_KEY);
-  String body = String("{\\"p_device\\":\\"") + DEV_ID + "\\",\\"p_token\\":\\"" + DEV_TOK +
-                "\\",\\"p_amount\\":" + amount + ",\\"p_ext\\":\\"" + extId + "\\"}";
-  int code = http.POST(body);
-  http.end();
-  return code == 200;
-}
-
-String newExtId() { if (!bootId) bootId = esp_random(); return String(bootId, HEX) + "-" + String(++seq); }
-
-// Misol: kupyura qabul qilinganda
-// String id = newExtId();
-// while (!sendIncome(5000, id)) delay(5000);`;}
-function vendKeyModal(dev,tok){
-  modal(`<h3>Avtomat ulandi: ${esc(dev)}</h3>
-  <p class="small" style="margin:0">Kalit faqat <b>hozir</b> ko'rsatiladi — nusxalab, avtomat proshivkasiga yozing. Yo'qolsa, "Yangi kalit" bosasiz.</p>
-  <label>Kalit (token)<input readonly value="${esc(tok)}" class="num" onclick="this.select()"></label>
-  <label>ESP32 uchun tayyor kod<textarea id="vdCode" rows="14" readonly style="font-family:ui-monospace,monospace;font-size:12px;white-space:pre">${esc(vendCode(dev,tok))}</textarea></label>
-  <div class="row" style="justify-content:flex-end"><button type="button" data-copy="vdCode">Kodni nusxalash</button><button type="button" class="pri" data-close>Tayyor</button></div>`);
-}
-function vendPanel(){
-  const devs=S.vendDevices||[], inc=S.vend||[], t=today(), m=t.slice(0,7);
-  const sumBy=(id,fn)=>inc.filter(x=>x.deviceId===id&&fn(x)).reduce((a,x)=>a+x.amount,0);
-  return `<section class="panel"><h2>Avtomatlar (Mecanuz)</h2>
-  <div class="tbl"><table><thead><tr><th>Avtomat</th><th class="r">Bugun</th><th class="r">Shu oy</th><th>Oxirgi aloqa</th><th></th></tr></thead><tbody>
-  ${devs.map(d=>`<tr><td><b>${esc(d.name)}</b><div class="small muted num">${esc(d.id)}${d.active?'':' · o\'chirilgan'}</div></td><td class="r num">${fmt(sumBy(d.id,x=>dayOf(x.ts)===t))}</td><td class="r num">${fmt(sumBy(d.id,x=>dayOf(x.ts).slice(0,7)===m))}</td>
-    <td class="small num">${d.lastSeen?dts(d.lastSeen):'—'}</td><td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-vdkey="${esc(d.id)}" title="Yangi kalit va kod">🔑 Yangi kalit</button><button class="sm" data-vdtog="${esc(d.id)}">${d.active?'O\'chirish':'Yoqish'}</button><button class="sm ghost" data-vddel="${esc(d.id)}" title="Butunlay o'chirish">✕</button></div></td></tr>`).join('')||'<tr><td colspan="5" class="muted">Hali avtomat ulanmagan</td></tr>'}
-  </tbody></table></div>
-  <form id="vdF" class="form" style="margin-top:12px"><label>ID (lotincha, masalan: avtomat1)<input id="vd_id" required pattern="[a-z0-9_\\-]{2,32}" placeholder="avtomat1"></label><label>Nomi<input id="vd_name" placeholder="Masalan: Chilonzor kofe avtomati"></label>
-    <div class="full row"><button class="pri">Avtomat qo'shish</button><span class="small muted">Har bir pul qabul qilinganda avtomat summani shu yerga yozadi. Tushum kunlik hisobot, tahlil va Telegram hisobotida chiqadi.</span></div></form></section>`;
-}
-
 /* Sozlamalar: avtomatik xabarlar va kanallar */
 function featPanel(){
   const f=FT(), sl=lineKeys().filter(k=>k!=='servis'), ck='class="full row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg);flex-wrap:nowrap;align-items:flex-start"';
@@ -1707,12 +1652,6 @@ document.addEventListener('submit', async (e) => {
       f.warranty = Object.fromEntries(lineKeys().map((k) => [k, { n: Math.max(0, Math.round(+v('ft_wn_' + k) || 0)), u: v('ft_wu_' + k) || 'oy' }]));
       await act(() => settingsUpd({ features: f }), 'Saqlandi');
     }
-    if (id === 'vdF') {
-      const did = v('vd_id').toLowerCase();
-      if (S.vendDevices.some((d) => d.id === did)) return toast('Bu ID band — boshqasini yozing');
-      const tok = await act(() => db.rpc('vend_device_save', { p_id: did, p_name: v('vd_name') || did, p_active: true, p_new_token: false }).then(must0));
-      if (tok) vendKeyModal(did, tok);
-    }
     if (id === 'pxF') {
       const pid = e.target.dataset.p, file = document.getElementById('px_file').files[0], btn = e.target.querySelector('button.pri');
       const body = { warranty: { n: Math.max(0, Math.round(+v('px_wn') || 0)), u: v('px_wu') || 'oy' }, min_qty: v('px_min') === '' ? '' : String(Math.max(0, Math.round(+v('px_min')))) };
@@ -1951,10 +1890,6 @@ document.addEventListener('click', async (e) => {
     if (b.dataset.anp) { anPeriod = b.dataset.anp; keepScroll(render); }
     if (b.dataset.chpost) { const id = b.dataset.chpost; await act(() => db.rpc('channel_post_now', { p_product: id }).then(must0), 'Navbatga qo\'yildi — 5 daqiqa ichida kanalga joylanadi'); pExtraModal(id); }
     if (b.dataset.copy) { const el = document.getElementById(b.dataset.copy); try { await navigator.clipboard.writeText(el.value); toast('Nusxalandi'); } catch { el.select(); document.execCommand('copy'); toast('Nusxalandi'); } }
-    if (b.dataset.vdkey) { const id = b.dataset.vdkey; const tok = await act(() => db.rpc('vend_device_save', { p_id: id, p_name: null, p_active: null, p_new_token: true }).then(must0)); if (tok) vendKeyModal(id, tok); }
-    if (b.dataset.vdtog) { const d = S.vendDevices.find((x) => x.id === b.dataset.vdtog); await act(() => db.rpc('vend_device_save', { p_id: d.id, p_name: null, p_active: !d.active, p_new_token: false }).then(must0), d.active ? 'Avtomat o\'chirildi' : 'Avtomat yoqildi'); }
-    if (b.dataset.vddel) { const id = b.dataset.vddel; modal(`<h3>Avtomatni o'chirish</h3><p>${esc(id)} avtomati va uning barcha tushum yozuvlari o'chiriladi. Davom etilsinmi?</p><div class="row" style="justify-content:flex-end"><button type="button" data-close>Yo'q</button><button class="pri" data-vddelyes="${esc(id)}">Ha, o'chirish</button></div>`); }
-    if (b.dataset.vddelyes) { await act(() => db.rpc('vend_device_delete', { p_id: b.dataset.vddelyes }).then(must0), "O'chirildi"); closeModal(); }
     if (b.dataset.pdel) modal(`<h3>Tovarni o'chirish</h3><p>${esc(S.products.find((p) => p.id === b.dataset.pdel)?.name || '')} butunlay o'chirilsinmi? Sotuvlar tarixida nomi saqlanib qoladi.</p><div class="row" style="justify-content:flex-end"><button type="button" data-close>Yo'q</button><button class="pri" data-pdelyes="${b.dataset.pdel}">Ha, o'chirish</button></div>`);
     if (b.dataset.pdelyes) { await act(() => db.rpc('owner_product_delete', { p_id: b.dataset.pdelyes }).then(must0), "Tovar o'chirildi"); closeModal(); }
     if (b.dataset.sedit) saleEditModal(b.dataset.sedit);
