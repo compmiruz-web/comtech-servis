@@ -49,6 +49,7 @@
 - Alohida so'rov faqat oxirgi 7 kunda qabul qilingan talonlarga; eskilari (holati yangilanmagan) kuniga bir marta bitta umumiy xabarda
 - Faqat ish vaqtida (odatiy 09:00–20:00), Sozlamalar → Avtomatik xabarlar va kanallar'da yoqish/o'chirish va vaqt
 - Dasturda Ustaxona ro'yxati muddatga qarab rangda: 1 kun sariq, 3 kun to'q sariq, 5 kun qizil, 8+ kun qizil miltillaydi; tepada "⚠️ Ustaxona nazorati" paneli
+- **Botda rahbar rejimi:** Sozlamalar → Telegram → "Botda boshqaruvchilar" (Telegram ID; rahbar: 726304835). Botga talon raqami yoki telefonning oxirgi 4+ raqamini yozsa talon chiqadi — holat tugmalari (Qabul / Diagnostika / Ta'mir / Tayyor / Topshirildi) va "💰 Narxni o'zgartirish". Tayyor'da narx bo'lmasa so'raydi
 
 ## Kelishuvlar
 - Javoblar o'zbek tilida

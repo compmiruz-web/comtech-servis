@@ -669,6 +669,8 @@ function vSozlamalar(){
       <label>Yuborish vaqti<input id="tg_rt" type="time" value="${esc(S.tg.reportTime)}"></label>
       <label>Zaxira baza kanali (ID)<input id="tg_ch" value="${esc(S.tg.channel)}" class="num"></label>
       <label>Zaxira vaqti<input id="tg_bt" type="time" value="${esc(S.tg.backupTime)}"></label>
+      <label class="full">Botda boshqaruvchilar — Telegram ID (vergul bilan)<input id="tg_admins" value="${esc((S.tg.admins||[]).join(', '))}" class="num" placeholder="726304835"></label>
+      <p class="full small muted" style="margin:0">Shu ID egalari botga talon raqami yoki telefonning oxirgi raqamlarini yozib, holat va narxni o'zgartira oladi. O'z ID'ingizni bilish: botga /id yozing.</p>
       <label class="full row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" id="tg_profit" ${S.tg.profit?'checked':''} style="width:auto"> Guruhga sof foydani ham yuborish</label>
       <div class="full row"><button class="pri">Saqlash</button><button type="button" id="repPrev">Hisobot namunasini ko'rish</button></div>
     </form>
@@ -1614,7 +1616,7 @@ document.addEventListener('submit', async (e) => {
       await act(() => settingsUpd({ printers: { receipt: v('pr_r') || 'WP230', receiptW: String(Math.min(120, Math.max(40, +v('pr_w') || 80))), label: v('pr_l') || 'XP-365B', labelW: lw, labelH: lh, stkW: sw, stkH: sh } }), 'Printer sozlamalari saqlandi');
     }
     if (id === 'tgF') {
-      await act(() => settingsUpd({ tg: { group: v('tg_group'), channel: v('tg_ch'), reportTime: v('tg_rt') || '21:00', backupTime: v('tg_bt') || '00:00', profit: document.getElementById('tg_profit').checked } }), 'Telegram sozlamalari saqlandi');
+      await act(() => settingsUpd({ tg: { ...S.tg, admins: v('tg_admins').split(/[\s,;]+/).map((x) => x.trim()).filter((x) => /^\d+$/.test(x)), group: v('tg_group'), channel: v('tg_ch'), reportTime: v('tg_rt') || '21:00', backupTime: v('tg_bt') || '00:00', profit: document.getElementById('tg_profit').checked } }), 'Telegram sozlamalari saqlandi');
     }
     if (id === 'rateF') {
       const nr = +v('rf_rate'); if (!(nr > 0)) return toast("Kursni to'g'ri kiriting");

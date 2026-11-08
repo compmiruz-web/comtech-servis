@@ -15,6 +15,50 @@ function readyButtons(talon: number) {
   return { inline_keyboard: [[{ text: '🚗 Olib ketaman', callback_data: `pick:${talon}` }, { text: "📞 Qo'ng'iroq qiling", callback_data: `call:${talon}` }]] };
 }
 
+// ===== Rahbar rejimi (Sozlamalar → Telegram → "Botda boshqaruvchilar") =====
+const isAdmin = (s: any, id: unknown) => (s.tg?.admins || []).map(String).includes(String(id));
+const ST_ORDER = ['qabul', 'diag', 'tamir', 'tayyor', 'berildi'];
+function adminButtons(talon: number, status: string) {
+  const b = (st: string) => ({ text: (st === status ? '● ' : '') + ST[st], callback_data: `ad:${st}:${talon}` });
+  return { inline_keyboard: [[b('qabul'), b('diag')], [b('tamir'), b('tayyor')], [b('berildi'), { text: "💰 Narxni o'zgartirish", callback_data: `ad:fee:${talon}` }]] };
+}
+function adminCard(r: any) {
+  const days = Math.floor((Date.now() - new Date(r.created_at).getTime()) / 864e5);
+  return [
+    `№${r.talon} · ${r.device}${r.model ? ' ' + r.model : ''}`,
+    `👤 ${r.client_name} · ${r.client_phone}${r.client_phone2 ? ' · ' + r.client_phone2 : ''}`,
+    `❗️ ${r.problem}`,
+    `Holati: ${ST[r.status] || r.status}`,
+    `💰 Narx: ${Number(r.fee_uzs) ? fmt(r.fee_uzs) + " so'm" : 'yozilmagan'}`,
+    `📅 Qabul: ${new Date(r.created_at).toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} (${days} kun)`,
+  ].join('\n');
+}
+const REP_COLS = 'talon,created_at,client_name,client_phone,client_phone2,device,model,problem,status,fee_uzs';
+async function adminSearch(db: Db, chat: number, text: string) {
+  const d = text.replace(/\D/g, '');
+  const found = new Map<number, any>();
+  if (d.length <= 7) {
+    const { data } = await db.from('repairs').select(REP_COLS).eq('talon', Number(d)).maybeSingle();
+    if (data) found.set(data.talon, data);
+  }
+  if (d.length >= 4) {
+    const { data } = await db.from('repairs').select(REP_COLS).or(`client_phone.like.*${d},client_phone2.like.*${d}`)
+      .order('talon', { ascending: false }).limit(20);
+    for (const r of data || []) found.set(r.talon, r);
+  }
+  const list = [...found.values()].sort((a, b) => (a.status === 'berildi' ? 1 : 0) - (b.status === 'berildi' ? 1 : 0) || b.talon - a.talon);
+  if (!list.length) return tg('sendMessage', { chat_id: chat, text: `"${text}" bo'yicha talon topilmadi.` });
+  const shown = list.slice(0, 6);
+  if (list.length > shown.length) await tg('sendMessage', { chat_id: chat, text: `${list.length} ta topildi, oxirgi ${shown.length} tasi (topshirilmaganlar oldin):` });
+  for (const r of shown) await tg('sendMessage', { chat_id: chat, text: adminCard(r), reply_markup: adminButtons(r.talon, r.status) });
+}
+const feeOf = (text: string) => {
+  const raw = text.replace(/[\s,.']/g, '').toLowerCase();
+  if (!/\d/.test(raw)) return NaN;
+  const k = /(ming|k)$/.test(raw) ? 1000 : 1;
+  return Number(raw.replace(/\D/g, '')) * k;
+};
+
 async function settings(db: Db) {
   const { data } = await db.from('settings').select('company,tg').eq('id', 1).single();
   return data || { company: {}, tg: {} };
@@ -42,6 +86,42 @@ Deno.serve(async (req) => {
   const u = await req.json();
 
   // Tugma bosildi: "Olib ketaman" / "Qo'ng'iroq qiling"
+  // Rahbar rejimi tugmalari: ad:<holat|fee>:<talon>
+  if (u.callback_query && String(u.callback_query.data || '').startsWith('ad:')) {
+    const cq = u.callback_query, chat = cq.message?.chat?.id, [, act, t] = String(cq.data).split(':'), talon = Number(t);
+    try {
+      const s = await settings(db);
+      if (!isAdmin(s, cq.from?.id)) {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, show_alert: true, text: "Sizda bu amalga ruxsat yo'q" });
+        return json({ ok: true });
+      }
+      const { data: r } = await db.from('repairs').select(REP_COLS).eq('talon', talon).maybeSingle();
+      if (!r) {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Talon topilmadi' });
+      } else if (act === 'fee') {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id });
+        await tg('sendMessage', { chat_id: chat, text: `💰 №${talon} yangi narxini yozing (so'm), masalan: 150000`, reply_markup: { force_reply: true, input_field_placeholder: `№${talon} narxi` } });
+      } else if (act === 'tayyor' && !Number(r.fee_uzs) && r.status !== 'tayyor') {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Narxini yozing 👇' });
+        await tg('sendMessage', { chat_id: chat, text: `💰 №${talon} ta'mir narxini yozing (so'm), masalan: 150000\nBepul bo'lsa 0 yozing. Narx yozilgach "Tayyor" bo'ladi va mijozga xabar ketadi.`, reply_markup: { force_reply: true, input_field_placeholder: `№${talon} narxi` } });
+      } else if (ST_ORDER.includes(act)) {
+        if (act !== r.status) {
+          const { error } = await db.from('repairs').update({ status: act, ask_msg_id: null, ...(act === 'tayyor' ? { notified_at: null } : {}) }).eq('talon', talon);
+          if (error) throw error;
+        }
+        const nr = { ...r, status: act };
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: `№${talon}: ${ST[act]} ✅` });
+        await tg('editMessageText', { chat_id: chat, message_id: cq.message.message_id, text: adminCard(nr) + (act === 'tayyor' && r.status !== 'tayyor' ? '\n\n📨 Mijozga 5 daqiqa ichida xabar ketadi' : ''), reply_markup: adminButtons(talon, act) }).catch(() => {});
+      } else {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id });
+      }
+    } catch (e) {
+      console.error(e);
+      await tg('answerCallbackQuery', { callback_query_id: cq.id, text: "Xatolik, keyinroq urinib ko'ring" }).catch(() => {});
+    }
+    return json({ ok: true });
+  }
+
   // Guruhdagi ustaxona so'rovi tugmalari: dq:<diag|tamir|tayyor|snooze>:<talon>
   if (u.callback_query && String(u.callback_query.data || '').startsWith('dq:')) {
     const cq = u.callback_query, chat = cq.message?.chat?.id, [, act, t] = String(cq.data).split(':'), talon = Number(t);
@@ -132,29 +212,38 @@ Deno.serve(async (req) => {
   try {
     if (text.startsWith('/id')) {
       await tg('sendMessage', { chat_id: chat, text: `Bu chat ID: ${chat}\nUni dasturdagi Sozlamalar → Telegram bo'limiga yozing.` });
-    } else if (m.chat.type !== 'private' && m.reply_to_message?.from?.is_bot && /№(\d+) ta'mir narxini yozing/.test(m.reply_to_message.text || '')) {
-      // Guruhda "Tayyor" uchun narx javobi
+    } else if (m.reply_to_message?.from?.is_bot && /№(\d+) (ta'mir|yangi) narxini yozing/.test(m.reply_to_message.text || '')) {
+      // Narx javobi: guruhda (Tayyor uchun) yoki rahbar shaxsiy chatda
       const s = await settings(db);
-      if (String(chat) === String(s.tg?.group)) {
-        const talon = Number((m.reply_to_message.text.match(/№(\d+)/) || [])[1]);
-        const raw = text.replace(/[\s,.']/g, '').toLowerCase();
-        const k = /(ming|k)$/.test(raw) ? 1000 : 1;
-        const fee = Number(raw.replace(/(ming|k|so'?m|sum)$/g, '').replace(/\D/g, '')) * k;
-        const { data: r } = await db.from('repairs').select('talon,status').eq('talon', talon).maybeSingle();
+      const okChat = m.chat.type === 'private' ? isAdmin(s, m.from?.id) : String(chat) === String(s.tg?.group);
+      if (okChat) {
+        const q = m.reply_to_message.text, talon = Number((q.match(/№(\d+)/) || [])[1]), makeReady = q.includes("ta'mir narxini");
+        const fee = feeOf(text);
+        const { data: r } = await db.from('repairs').select(REP_COLS).eq('talon', talon).maybeSingle();
         const who = [m.from?.first_name, m.from?.last_name].filter(Boolean).join(' ') || 'xodim';
         if (!r) {
           await tg('sendMessage', { chat_id: chat, reply_to_message_id: m.message_id, text: `№${talon} talon topilmadi.` });
-        } else if (['tayyor', 'berildi'].includes(r.status)) {
+        } else if (!Number.isFinite(fee)) {
+          await tg('sendMessage', { chat_id: chat, reply_to_message_id: m.message_id, text: "Narxni raqam bilan yozing, masalan: 150000. So'rov xabariga javob qilib qayta yozing." });
+        } else if (makeReady && ['tayyor', 'berildi'].includes(r.status)) {
           await tg('sendMessage', { chat_id: chat, reply_to_message_id: m.message_id, text: `№${talon} allaqachon: ${ST[r.status]}` });
-        } else if (!/\d/.test(text) || !Number.isFinite(fee)) {
-          await tg('sendMessage', { chat_id: chat, reply_to_message_id: m.message_id, text: `Narxni raqam bilan yozing, masalan: 150000. Iltimos, yuqoridagi so'rovga javob qilib qayta yozing.` });
         } else {
-          await db.from('repairs').update({ fee_uzs: fee, status: 'tayyor', notified_at: null, ask_msg_id: null }).eq('talon', talon);
-          await tg('sendMessage', { chat_id: chat, reply_to_message_id: m.message_id, text: `✅ №${talon} tayyor · ${fmt(fee)} so'm (${who}). Mijozga 5 daqiqa ichida xabar ketadi.` });
+          const { error } = await db.from('repairs').update({ fee_uzs: fee, ...(makeReady ? { status: 'tayyor', notified_at: null, ask_msg_id: null } : {}) }).eq('talon', talon);
+          if (error) throw error;
+          const nr = { ...r, fee_uzs: fee, status: makeReady ? 'tayyor' : r.status };
+          if (m.chat.type === 'private') {
+            await tg('sendMessage', { chat_id: chat, text: adminCard(nr) + (makeReady ? '\n\n📨 Mijozga 5 daqiqa ichida xabar ketadi' : "\n\n✅ Narx saqlandi"), reply_markup: adminButtons(talon, nr.status) });
+          } else {
+            await tg('sendMessage', { chat_id: chat, reply_to_message_id: m.message_id, text: `✅ №${talon} tayyor · ${fmt(fee)} so'm (${who}). Mijozga 5 daqiqa ichida xabar ketadi.` });
+          }
         }
       }
     } else if (m.chat.type !== 'private') {
       // guruhlarda boshqa buyruqlarga javob bermaymiz
+    } else if (m.chat.type === 'private' && /^(\/start|\/admin)$/.test(text) && isAdmin(await settings(db), m.from?.id)) {
+      await tg('sendMessage', { chat_id: chat, reply_markup: { remove_keyboard: true }, text: "👑 Rahbar rejimi\n\nTalon raqamini (masalan 1250) yoki mijoz telefonining oxirgi 4+ raqamini (masalan 4567) yozing — talon chiqadi, holatini va narxini shu yerdan o'zgartirasiz." });
+    } else if (m.chat.type === 'private' && /^[\d\s+()№#-]{1,20}$/.test(text) && /\d/.test(text) && isAdmin(await settings(db), m.from?.id)) {
+      await adminSearch(db, chat, text);
     } else if (m.contact) {
       if (m.contact.user_id && m.contact.user_id !== m.from?.id) {
         await tg('sendMessage', { chat_id: chat, text: "Iltimos, o'zingizning raqamingizni tugma orqali yuboring." });
