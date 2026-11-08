@@ -5,6 +5,7 @@
 // 4) Kam qolgan tovarlar haqida guruhga ogohlantirish
 // 5) Yangi tovarlarni Telegram kanallarga joylash
 // 6) Dushanba kuni haftalik, oyning 1-kuni oylik tahlil
+// 7) Ustaxona nazorati: qabul/diagnostikadagi qurilmalar bo'yicha guruhga so'rov (javob bo'lmasa har 30 daqiqada qayta)
 import { admin, CATS, dmy, env, fmt, json, PAYS, phoneKey, tashkentNow, tg, tgForm } from '../_shared/common.ts';
 
 import * as XLSX from 'npm:xlsx@0.18.5';
@@ -36,6 +37,7 @@ Deno.serve(async (req) => {
     try { done.push(`reminded:${await remindCredit(db, s, day)}`); } catch (e) { done.push('remind-err:' + e); }
     try { done.push(`low:${await lowStock(db, s)}`); } catch (e) { done.push('low-err:' + e); }
     try { done.push(`posted:${await channelPosts(db, s)}`); } catch (e) { done.push('post-err:' + e); }
+    try { done.push(`asked:${await askRepairs(db, s, hm, force === 'diag')}`); } catch (e) { done.push('ask-err:' + e); }
     const f = s.features || {};
     const dow = new Date(`${day}T12:00:00Z`).getUTCDay();
     if (force === 'weekly' || (f.weekly !== false && dow === 1 && hm >= '09:00' && s.last_weekly !== day)) {
@@ -389,4 +391,68 @@ async function sendAnalytics(db: Db, s: any, from: string, to: string, kind: 'we
     title: `${kind === 'week' ? 'Haftalik' : 'Oylik'} tahlil: sof foyda ${fmt(t.net)} so'm`,
     body: [...base.slice(2), ...profitLines, ...rest].join('\n'), ref: `${kind}-${from}`,
   }).then(() => {}, () => {});
+}
+
+
+// ===== Ustaxona nazorati: guruhga "Diagnostika qildingizmi?" so'rovi =====
+// Javob bo'lmasa har 30 daqiqada qayta (eski so'rov o'chirilib, yangisi pastga tushadi).
+// Faqat ish vaqtida (Sozlamalar → Avtomatik xabarlar: odatiy 09:00–20:00).
+const ASK_EVERY_MIN = 30;
+const ageTxt = (t: string) => {
+  const m = Math.max(0, Math.round((Date.now() - new Date(t).getTime()) / 60000));
+  if (m < 60) return `${m} daqiqa`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} soat`;
+  const d = Math.floor(h / 24), hh = h % 24;
+  return `${d} kun${hh ? ` ${hh} soat` : ''}`;
+};
+function askButtons(talon: number, status: string) {
+  const row1 = status === 'qabul'
+    ? [{ text: '🔍 Diagnostika qilinyapti', callback_data: `dq:diag:${talon}` }, { text: "🔧 Ta'mirga o'tdi", callback_data: `dq:tamir:${talon}` }]
+    : [{ text: "🔧 Ta'mirga o'tdi", callback_data: `dq:tamir:${talon}` }, { text: '✅ Tayyor', callback_data: `dq:tayyor:${talon}` }];
+  return { inline_keyboard: [row1, [{ text: '⏳ 1 soatdan keyin so\'ra', callback_data: `dq:snooze:${talon}` }]] };
+}
+
+async function askRepairs(db: Db, s: any, hm: string, force: boolean) {
+  const f = s.features || {};
+  if (f.diagAsk === false || !s.tg?.group) return 0;
+  const from = f.askFrom || '09:00', to = f.askTo || '20:00';
+  if (!s.features?.diagAskHello) {
+    // Birinchi ishga tushganda guruhga tekshiruv xabari (bot guruhga yoza olishini ko'rsatadi)
+    await tg('sendMessage', { chat_id: s.tg.group, text: `✅ Ustaxona nazorati yoqildi.\n\nQabul qilingan qurilmalar bo'yicha shu guruhga "Diagnostika qildingizmi?" deb so'rayman. Javob berilmasa har ${ASK_EVERY_MIN} daqiqada qayta so'rayman (ish vaqti: ${from}–${to}).` });
+    await db.from('settings').update({ features: { ...(s.features || {}), diagAskHello: true } }).eq('id', 1);
+  }
+  if (!force && (hm < from || hm >= to)) return 0;
+  let q = db.from('repairs').select('talon,created_at,status_at,status,client_name,device,model,problem,master_id,ask_msg_id,ask_count')
+    .in('status', ['qabul', 'diag']).not('ask_next_at', 'is', null).order('talon').limit(15);
+  if (!force) q = q.lte('ask_next_at', new Date().toISOString());
+  const { data: list, error } = await q;
+  if (error) throw error;
+  if (!list?.length) return 0;
+  const { data: profs } = await db.from('profiles').select('id,name');
+  const nm = (id: string | null) => (profs || []).find((p: any) => p.id === id)?.name || '—';
+  let n = 0;
+  for (const r of list) {
+    const cnt = Number(r.ask_count || 0) + 1;
+    const head = r.status === 'qabul'
+      ? `🔍 №${r.talon} — diagnostika qildingizmi?`
+      : `🔧 №${r.talon} — diagnostika natijasi qanday? Ta'mirga o'tdimi?`;
+    const text = [
+      head, '',
+      `📱 ${r.device}${r.model ? ' ' + r.model : ''}`,
+      `❗️ Muammo: ${r.problem}`,
+      `👤 Mijoz: ${r.client_name}`,
+      `🛠 Usta: ${nm(r.master_id)}`,
+      `⏱ Servisda: ${ageTxt(r.created_at)}${r.status === 'diag' ? ` · diagnostikada: ${ageTxt(r.status_at || r.created_at)}` : ''}`,
+      ...(cnt > 1 ? ['', `⚠️ ${cnt}-marta so'ralyapti — javob berilmadi!`] : []),
+    ].join('\n');
+    if (r.ask_msg_id) await tg('deleteMessage', { chat_id: s.tg.group, message_id: r.ask_msg_id }).catch(() => {});
+    const msg = await tg('sendMessage', { chat_id: s.tg.group, text, reply_markup: askButtons(r.talon, r.status) });
+    await db.from('repairs').update({
+      ask_msg_id: msg?.message_id || null, ask_count: cnt,
+      ask_next_at: new Date(Date.now() + ASK_EVERY_MIN * 60000).toISOString(),
+    }).eq('talon', r.talon);
+    n++;
+  }
+  return n;
 }

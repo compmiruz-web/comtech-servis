@@ -140,6 +140,19 @@ td.r,th.r{text-align:right}
 .s-qabul{background:var(--info-soft);color:var(--info)}
 .s-diag,.s-tamir{background:var(--warn-soft);color:var(--warn)}
 .s-tayyor{background:var(--accent-soft);color:var(--ok)}
+/* Ustaxona: muddat o'tgan sari qizarish */
+tr.age1 td{background:color-mix(in srgb,var(--warn-soft) 55%,transparent)}
+tr.age2 td{background:var(--warn-soft)}
+tr.age2 td:first-child{box-shadow:inset 4px 0 0 var(--warn)}
+tr.age3 td{background:var(--bad-soft)}
+tr.age3 td:first-child{box-shadow:inset 4px 0 0 var(--bad)}
+tr.age4 td{background:var(--bad-soft);animation:agePulse 1.6s ease-in-out infinite}
+tr.age4 td:first-child{box-shadow:inset 6px 0 0 var(--bad)}
+@keyframes agePulse{50%{background:color-mix(in srgb,var(--bad) 28%,var(--bad-soft))}}
+.agebadge{display:inline-block;margin-top:4px;font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--warn-soft);color:var(--warn);white-space:nowrap}
+tr.age3 .agebadge,tr.age4 .agebadge{background:var(--bad);color:#fff}
+.agepanel{border-left:4px solid var(--bad)}
+@media (prefers-reduced-motion:reduce){tr.age4 td{animation:none}}
 .s-berildi{background:var(--sunk);color:var(--muted)}
 .talonno{font-family:var(--mono);font-weight:600;letter-spacing:.02em}
 td.talonno{border-left:3px solid var(--accent)}
@@ -229,7 +242,7 @@ body{margin:0}
 </style>
 
 
-  <script type="module" crossorigin src="./assets/index-BmoHxIYN.js"></script>
+  <script type="module" crossorigin src="./assets/index-D71K8rHE.js"></script>
 </head>
 <body>
 <div class="app">

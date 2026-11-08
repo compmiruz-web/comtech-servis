@@ -42,6 +42,46 @@ Deno.serve(async (req) => {
   const u = await req.json();
 
   // Tugma bosildi: "Olib ketaman" / "Qo'ng'iroq qiling"
+  // Guruhdagi ustaxona so'rovi tugmalari: dq:<diag|tamir|tayyor|snooze>:<talon>
+  if (u.callback_query && String(u.callback_query.data || '').startsWith('dq:')) {
+    const cq = u.callback_query, chat = cq.message?.chat?.id, [, act, t] = String(cq.data).split(':'), talon = Number(t);
+    try {
+      const s = await settings(db);
+      if (String(chat) !== String(s.tg?.group)) {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Bu tugma faqat ishchi guruhda ishlaydi' });
+        return json({ ok: true });
+      }
+      const { data: r } = await db.from('repairs').select('talon,status,fee_uzs,device,model').eq('talon', talon).maybeSingle();
+      const who = [cq.from?.first_name, cq.from?.last_name].filter(Boolean).join(' ') || cq.from?.username || 'xodim';
+      const now = new Date().toLocaleTimeString('ru-RU', { timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit' });
+      const done = async (line: string) => {
+        await tg('editMessageText', { chat_id: chat, message_id: cq.message.message_id, text: `${cq.message.text}\n\n${line}` }).catch(() => {});
+      };
+      if (!r) {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Talon topilmadi' });
+      } else if (!['qabul', 'diag'].includes(r.status)) {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: `Holati allaqachon: ${ST[r.status] || r.status}` });
+        await done(`ℹ️ Holati dasturda o'zgartirilgan: ${ST[r.status] || r.status}`);
+      } else if (act === 'snooze') {
+        await db.from('repairs').update({ ask_next_at: new Date(Date.now() + 60 * 60000).toISOString(), ask_count: 0, ask_msg_id: null }).eq('talon', talon);
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: "1 soatdan keyin yana so'rayman" });
+        await done(`⏳ ${who} (${now}): 1 soatdan keyin so'raladi`);
+      } else if (act === 'tayyor' && !Number(r.fee_uzs)) {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, show_alert: true, text: "Avval dasturda narxini yozing, keyin \"Tayyor\" qiling — mijozga narx bilan xabar boradi." });
+      } else if (['diag', 'tamir', 'tayyor'].includes(act)) {
+        await db.from('repairs').update({ status: act, ask_msg_id: null, ...(act === 'tayyor' ? { notified_at: null } : {}) }).eq('talon', talon);
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text: `№${talon}: ${ST[act]} ✅` });
+        await done(`✅ ${who} (${now}): ${ST[act]}${act === 'tayyor' ? ' — mijozga xabar ketadi' : ''}`);
+      } else {
+        await tg('answerCallbackQuery', { callback_query_id: cq.id });
+      }
+    } catch (e) {
+      console.error(e);
+      await tg('answerCallbackQuery', { callback_query_id: cq.id, text: "Xatolik, keyinroq urinib ko'ring" }).catch(() => {});
+    }
+    return json({ ok: true });
+  }
+
   if (u.callback_query) {
     const cq = u.callback_query, chat = cq.message?.chat?.id, [kind, t] = String(cq.data || '').split(':');
     try {

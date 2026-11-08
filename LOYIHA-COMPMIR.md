@@ -19,7 +19,7 @@
 
 ## Tuzilishi
 - Ilova: Vite + oddiy JavaScript (`manba/app/src/main.js`), PWA — Android, iOS, kompyuterda ishlaydi
-- Baza o'zgarishlari: `manba/supabase/migrations/0001 … 0020` (hammasi serverga qo'yilgan)
+- Baza o'zgarishlari: `manba/supabase/migrations/0001 … 0021` (0021 — ustaxona nazorati)
 - Server funksiyalari (Supabase Edge): `tick` (har 5 daqiqada), `tg-bot` (Telegram bot), `admin-users`
   - Dashboard uchun bitta faylli nusxalar: `manba/deploy/tick.ts`, `manba/deploy/tg-bot.ts`
   - "Verify JWT" o'chiq turishi shart
@@ -42,6 +42,12 @@
 3. **Tahlil** bo'limi: eng ko'p sotilgan / eng foydali tovarlar, bo'limlar, sotuvchilar, ustalar, grafik; dushanba 09:00 haftalik, oyning 1-kuni 09:00 oylik tahlil guruhga
 4. **Kafolat** bo'limi: shtrix-kod yoki seriya bo'yicha — kimga, qachon sotilgan, kafolat amalda / tugagan
 5. **Telegram kanallarga joylash:** yangi tovar rasm, narx, kafolat bilan (Sozlamalar → Avtomatik xabarlar va kanallar; bot kanalga admin bo'lishi kerak; hozircha o'chiq)
+
+### 2026-11-08 (2) — Ustaxona nazorati
+- Guruhga so'rov: "Qabul qilindi"dagi har talon bo'yicha "🔍 Diagnostika qildingizmi?" (tugmalar: Diagnostika qilinyapti / Ta'mirga o'tdi / 1 soatdan keyin so'ra). Javob bo'lmasa **har 30 daqiqada** qayta (eski xabar o'chib, yangisi pastga tushadi, "N-marta so'ralyapti" yoziladi)
+- "Diagnostikada" 2 soatdan oshsa: "Natijasi qanday?" (Ta'mirga o'tdi / Tayyor — narx yozilmagan bo'lsa Tayyor qilmaydi)
+- Faqat ish vaqtida (odatiy 09:00–20:00), Sozlamalar → Avtomatik xabarlar va kanallar'da yoqish/o'chirish va vaqt
+- Dasturda Ustaxona ro'yxati muddatga qarab rangda: 1 kun sariq, 3 kun to'q sariq, 5 kun qizil, 8+ kun qizil miltillaydi; tepada "⚠️ Ustaxona nazorati" paneli
 
 ## Kelishuvlar
 - Javoblar o'zbek tilida

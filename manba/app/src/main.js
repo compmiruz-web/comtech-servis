@@ -476,6 +476,25 @@ function saleEditModal(id){
 }
 
 /* ---------- USTAXONA ---------- */
+/* Servisda turgan muddatiga qarab qizarish: 1 kun — sariq, 3 kun — to'q sariq, 5 kun — qizil, 8+ kun — qizil miltillaydi */
+function repAge(r){
+  if(r.status==='berildi'||!r.ts) return {cls:'',d:0,txt:''};
+  const h=(Date.now()-r.ts)/36e5, d=Math.floor(h/24);
+  const txt=d>=1?`${d} kun`:`${Math.floor(h)} soat`;
+  const cls=d>=8?'age4':d>=5?'age3':d>=3?'age2':d>=1?'age1':'';
+  return {cls,d,txt};
+}
+function ageBanner(){
+  const act=S.repairs.filter(r=>r.status!=='berildi'), old=act.filter(r=>repAge(r).d>=5), mid=act.filter(r=>{const d=repAge(r).d;return d>=3&&d<5;});
+  const wait=act.filter(r=>r.status==='qabul'&&r.ts&&Date.now()-r.ts>36e5*2);
+  if(!old.length&&!mid.length&&!wait.length) return '';
+  const lst=a=>a.sort((x,y)=>x.ts-y.ts).slice(0,12).map(r=>`<b>№${tn(r.talon)}</b> (${repAge(r).txt})`).join(', ')+(a.length>12?` … yana ${a.length-12} ta`:'');
+  return `<section class="panel agepanel"><h2>⚠️ Ustaxona nazorati</h2>
+    ${old.length?`<p style="margin:0 0 6px"><span class="chip bad">${old.length} ta</span> 5 kundan ortiq turibdi: ${lst(old)}</p>`:''}
+    ${mid.length?`<p style="margin:0 0 6px"><span class="chip warn">${mid.length} ta</span> 3–4 kundan beri: ${lst(mid)}</p>`:''}
+    ${wait.length?`<p style="margin:0"><span class="chip warn">${wait.length} ta</span> hali diagnostika boshlanmagan (2 soatdan ortiq "Qabul qilindi"da): ${lst(wait)}</p>`:''}
+  </section>`;
+}
 function vUstaxona(){
   const q=rSearch.toLowerCase().replace(/^t(?=\d)/,'');
   let list=S.repairs.slice().sort((a,b)=>b.talon-a.talon);
@@ -497,19 +516,20 @@ function vUstaxona(){
       <label>Usta<select id="r_master">${S.users.filter(u=>(isUsta(u)||u.role==='owner')&&u.active).map(u=>`<option value="${u.id}" ${u.id===S.cur?'selected':''}>${esc(u.name)}${u.role==='owner'?' (o\'zim)':''}</option>`).join('')}</select></label>
       <div class="full row"><button class="pri">Qabul qilish va talon chiqarish</button></div>
     </form></section>
+  ${ageBanner()}
   <section class="panel">
     <div class="row" style="margin-bottom:10px">
       <select id="rFilter" style="width:auto"><option value="hammasi" ${rFilter==='hammasi'?'selected':''}>Hammasi</option><option value="aktiv" ${rFilter==='aktiv'?'selected':''}>Faol (topshirilmagan)</option>${STATUSES.map(s=>`<option value="${s[0]}" ${rFilter===s[0]?'selected':''}>${s[1]}</option>`).join('')}</select>
       <input id="rSearch" placeholder="Talon №, telefon, ism…" value="${esc(rSearch)}" style="flex:1;min-width:160px">
     </div>
     <div class="tbl"><table><thead><tr><th>Talon</th><th>Mijoz</th><th>Qurilma / muammo</th><th>Holati</th><th class="r">Narx</th><th></th></tr></thead><tbody>
-    ${list.map(r=>`<tr data-ts="${r.ts||0}"><td class="talonno">№${tn(r.talon)}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div></td>
+    ${list.map(r=>{const ag=repAge(r);return `<tr data-ts="${r.ts||0}" class="${ag.cls}" title="${ag.cls?'Servisda '+ag.txt:''}"><td class="talonno">№${tn(r.talon)}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div>${ag.cls?`<div class="agebadge">⏱ ${ag.txt}</div>`:''}</td>
       <td>${esc(r.name)}<div class="small muted num">${esc(r.phone)}</div>${r.phone2?`<div class="small muted num">2: ${esc(r.phone2)}</div>`:''}${r.phoneOld?`<div class="small muted num" title="Avvalgi (o'zgartirilgan) raqam"><s>${esc(r.phoneOld)}</s> eski</div>`:''}</td>
       <td>${esc(r.device)}${r.model?' · '+esc(r.model):''}<div class="small muted">${esc(r.problem)}</div><div class="small muted">Usta: ${esc(uName(r.masterId))}</div></td>
       <td><select data-st="${r.talon}" style="width:auto;padding:4px 8px" aria-label="Holati">${STATUSES.map(s=>`<option value="${s[0]}" ${s[0]===r.status?'selected':''}>${s[1]}</option>`).join('')}</select>
         <div style="margin-top:4px"><span class="status s-${r.status}">${stName(r.status)}</span></div>${r.pickupTs&&r.status==='tayyor'?`<div class="chip ok" style="margin-top:4px;font-size:12px" title="Mijoz botda bosgan vaqt: ${dts(r.pickupTs)}">🚗 Mijoz olib ketishga keladi</div>`:''}</td>
       <td class="r"><input data-fee="${r.talon}" type="number" step="any" min="0" value="${r.feeUzs||''}" style="width:110px;text-align:right" class="num" aria-label="Narx"></td>
-      <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-talon="${r.talon}">Talon</button><button class="sm" data-redit="${r.talon}">Tahrirlash</button><button class="sm" data-stk="r${r.talon}">Yopishtirgich</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">Topilmadi</td></tr>'}
+      <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-talon="${r.talon}">Talon</button><button class="sm" data-redit="${r.talon}">Tahrirlash</button><button class="sm" data-stk="r${r.talon}">Yopishtirgich</button></div></td></tr>`;}).join('')||'<tr><td colspan="6" class="muted">Topilmadi</td></tr>'}
     </tbody></table></div>
   </section>`;
 }
@@ -1174,6 +1194,9 @@ function featPanel(){
     <label ${ck}><input type="checkbox" id="ft_low" ${f.lowStock!==false?'checked':''} style="width:auto"> Tovar kam qolganda Telegram guruhga va "Bildirishnoma"ga xabar ("buyurtma qilish kerak")</label>
     ${sl.map(k=>`<label>${esc(lineNm(k))}: shundan kam qolsa<input id="ft_min_${k}" type="number" min="0" step="1" value="${+(f.minQty||{})[k]||0}" class="num"></label>`).join('')}
     <p class="full small muted" style="margin:0">0 — bu bo'lim uchun ogohlantirish yo'q (masalan, har biri bittadan bo'lgan noutbuklar). Har bir tovarga alohida chegara: Ombor → 📷 tugmasi.</p>
+    <label ${ck}><input type="checkbox" id="ft_diag" ${f.diagAsk!==false?'checked':''} style="width:auto"> Ustaxona nazorati: qabul qilingan qurilmalar bo'yicha guruhga "Diagnostika qildingizmi?" so'rovi (javob bo'lmasa har 30 daqiqada qayta)</label>
+    <label>So'rov vaqti: dan<input id="ft_askFrom" type="time" value="${esc(f.askFrom||'09:00')}"></label>
+    <label>gacha<input id="ft_askTo" type="time" value="${esc(f.askTo||'20:00')}"></label>
     <label ${ck}><input type="checkbox" id="ft_week" ${f.weekly!==false?'checked':''} style="width:auto"> Har dushanba 09:00 da haftalik tahlil (guruhga va shu yerga)</label>
     <label ${ck}><input type="checkbox" id="ft_month" ${f.monthly!==false?'checked':''} style="width:auto"> Har oyning 1-kuni 09:00 da oylik tahlil</label>
     <label ${ck}><input type="checkbox" id="ft_post" ${f.autoPost?'checked':''} style="width:auto"> Kirim qilingan yangi tovar Telegram kanalga avtomatik joylansin (rasm, narx, kafolat bilan)</label>
@@ -1647,6 +1670,7 @@ document.addEventListener('submit', async (e) => {
     if (id === 'featF') {
       const f = { ...(S.features || {}) }, sl = lineKeys().filter((k) => k !== 'servis');
       f.lowStock = document.getElementById('ft_low').checked; f.weekly = document.getElementById('ft_week').checked; f.monthly = document.getElementById('ft_month').checked; f.autoPost = document.getElementById('ft_post').checked;
+      f.diagAsk = document.getElementById('ft_diag').checked; f.askFrom = v('ft_askFrom') || '09:00'; f.askTo = v('ft_askTo') || '20:00';
       f.minQty = Object.fromEntries(sl.map((k) => [k, Math.max(0, Math.round(+v('ft_min_' + k) || 0))]).filter(([, n]) => n > 0));
       f.channels = Object.fromEntries(sl.map((k) => { let c = v('ft_ch_' + k).replace(/^https?:\/\/t\.me\//, ''); if (c && !/^-?\d+$/.test(c) && !c.startsWith('@')) c = '@' + c; return [k, c]; }).filter(([, c]) => c));
       f.warranty = Object.fromEntries(lineKeys().map((k) => [k, { n: Math.max(0, Math.round(+v('ft_wn_' + k) || 0)), u: v('ft_wu_' + k) || 'oy' }]));
