@@ -672,6 +672,12 @@ function vSozlamalar(){
     <datalist id="rwl"><option value="80"><option value="58"><option value="57"><option value="76"></datalist>
     <label>Chek qog'ozi bo'yi (mm, 0 — rulon)<input id="pr_h" type="number" min="0" max="300" value="${+S.printers.receiptH||0}" class="num"></label>
     <div class="full row" style="gap:6px"><span class="small muted">Tayyor o'lcham:</span><button type="button" class="sm" data-ckpre="57x60">57 × 60</button><button type="button" class="sm" data-ckpre="58x0">58 rulon</button><button type="button" class="sm" data-ckpre="80x0">80 rulon</button></div>
+    <label>Chekdan keyin qog'oz surish (mm)<input id="pr_feed" type="number" min="0" max="60" value="${S.printers.feedMm==null||S.printers.feedMm===''?15:+S.printers.feedMm}" class="num"></label>
+    <details class="full"><summary class="small">Printer chekni o'zi kesib bersin (XP-80) — sozlash</summary><ol class="small muted" style="margin:6px 0 0;padding-left:18px">
+      <li>Windows → <b>Принтеры и сканеры</b> → <b>${esc(S.printers.receipt||'XP-80')}</b> → <b>Настройки печати</b> (Printing preferences).</li>
+      <li><b>Дополнительно / Advanced</b> → <b>Paper Cut</b> (Отрезка) → <b>Cut after each page</b> yoki <b>Partial cut</b> ni tanlang. "Feed lines before cut" (kesishdan oldin surish) — 3–5.</li>
+      <li>Qog'oz o'lchami: <b>80 × 297</b> yoki <b>80 × Receipt</b>, chegaralar (margin) 0.</li>
+      <li>Printerda pichoq bo'lmasa (XP-80 da "C" belgisi yo'q), kesmaydi — unda shu yerdagi "qog'oz surish" chekni yirtish tishigacha chiqarib beradi, qo'lda tugma bosish shart emas.</li></ol></details>
     <label>Chek va talon shrifti<select id="pr_font">${[['0.8','Juda kichik'],['0.9','Kichik'],['1','O\'rtacha'],['1.15','Katta'],['1.3','Juda katta'],['1.5','Eng katta']].map(([v,n])=>`<option value="${v}" ${String(+S.printers.receiptFont||1)===String(+v)?'selected':''}>${n}</option>`).join('')}</select></label>
     <label class="full">Chek va talon tepasiga qo'shimcha matn<textarea id="pr_ckTop" rows="2" placeholder="Masalan: manzil, ish vaqti">${esc(S.printers.ckTop||'')}</textarea></label>
     <label class="full">Sotuv cheki pastiga qo'shimcha matn<textarea id="pr_ckBottom" rows="2" placeholder="Masalan: Tovar 14 kun ichida almashtiriladi">${esc(S.printers.ckBottom||'')}</textarea></label>
@@ -1632,7 +1638,7 @@ document.addEventListener('submit', async (e) => {
     }
     if (id === 'prF') {
       const [lw, lh] = dims(v('pr_lw') + 'x' + v('pr_lh')), [sw, sh] = dims(v('pr_sw') + 'x' + v('pr_sh'));
-      await act(() => settingsUpd({ printers: { receipt: v('pr_r') || 'WP230', ...S.printers, receiptW: String(Math.min(120, Math.max(40, +v('pr_w') || 80))), receiptH: String(Math.min(300, Math.max(0, Math.round(+v('pr_h') || 0)))), receiptFont: v('pr_font') || '1',
+      await act(() => settingsUpd({ printers: { receipt: v('pr_r') || 'WP230', ...S.printers, receiptW: String(Math.min(120, Math.max(40, +v('pr_w') || 80))), receiptH: String(Math.min(300, Math.max(0, Math.round(+v('pr_h') || 0)))), receiptFont: v('pr_font') || '1', feedMm: String(Math.min(60, Math.max(0, Math.round(+v('pr_feed') || 0)))),
         ckTop: v('pr_ckTop'), ckBottom: v('pr_ckBottom'), tkBottom: v('pr_tkBottom'), tkBot: document.getElementById('pr_tkBot').checked, label: v('pr_l') || 'XP-365B', labelW: lw, labelH: lh, stkW: sw, stkH: sh } }), 'Printer sozlamalari saqlandi');
     }
     if (id === 'tgF') {
@@ -2027,7 +2033,12 @@ document.addEventListener('click', async (e) => {
     if (b.dataset.redit) editRepair(+b.dataset.redit);
     if (b.dataset.print) {
       const w = b.dataset.print;
-      if (w === 'ticket') printHtml(document.querySelector('.modal .ticket').outerHTML, +S.printers.receiptW || 80, +S.printers.receiptH || 0);
+      if (w === 'ticket') {
+        // Chekdan keyin qog'ozni surish: printer pichog'i / yirtish tishigacha chiqsin. Oxirida ko'rinadigan belgi bo'lmasa drayver bo'sh joyni tashlab yuboradi — shuning uchun kesish chizig'i qo'yiladi
+        const feed = Math.min(60, Math.max(0, S.printers.feedMm == null || S.printers.feedMm === '' ? 15 : +S.printers.feedMm));
+        const tail = feed ? `<div class="ckfeed" style="height:${feed}mm"></div><div class="ckcut">- - - - - ✂ - - - - -</div>` : '';
+        printHtml(document.querySelector('.modal .ticket').outerHTML.replace(/<\/div>\s*$/, tail + '</div>'), +S.printers.receiptW || 80, +S.printers.receiptH || 0);
+      }
       if (w === 'labels' && canStock()) { const pr = S.products.find((x) => x.id === document.getElementById('lbSheet')?.dataset.p), wn = +document.getElementById('lb_wn')?.value || 0, wu = document.getElementById('lb_wu')?.value || 'oy';
         if (pr && (!pr.warranty || +pr.warranty.n !== wn || pr.warranty.u !== wu)) { pr.warranty = { n: wn, u: wu }; db.rpc('product_set_extra', { p_id: pr.id, p: { warranty: { n: wn, u: wu } } }).then(() => {}, () => {}); } }
       if (w === 'labels') { const [lw, lh] = dims(readSize('lb')); const n = Math.min(200, Math.max(1, +document.getElementById('lb_n').value || 1)); const one1 = document.querySelector('#lbSheet .label').outerHTML; printHtml(Array(n).fill(one1).join(''), lw, lh); }
