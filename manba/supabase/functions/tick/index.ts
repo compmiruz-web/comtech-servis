@@ -32,6 +32,10 @@ Deno.serve(async (req) => {
       done.push('webhook');
     }
     if (!env('TG_BOT_TOKEN')) return json({ ok: true, day, hm, note: 'TG_BOT_TOKEN hali qo\'shilmagan' });
+    // Bot nomi (talondagi QR kod uchun) — bir marta aniqlanadi
+    if (!s.tg?.bot) {
+      try { const me = await tg('getMe', {}); if (me?.username) { s.tg = { ...(s.tg || {}), bot: me.username }; await db.from('settings').update({ tg: s.tg }).eq('id', 1); done.push('bot:' + me.username); } } catch (e) { done.push('getMe-err:' + e); }
+    }
     // Mijozlarga xabarlar birinchi: hisobot/zaxira xatosi ularni to'xtatib qo'ymasin
     try { done.push(`notified:${await notifyReady(db, s)}`); } catch (e) { done.push('notify-err:' + e); }
     try { done.push(`reminded:${await remindCredit(db, s, day)}`); } catch (e) { done.push('remind-err:' + e); }

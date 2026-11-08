@@ -244,6 +244,17 @@ Deno.serve(async (req) => {
       await tg('sendMessage', { chat_id: chat, reply_markup: { remove_keyboard: true }, text: "👑 Rahbar rejimi\n\nTalon raqamini (masalan 1250) yoki mijoz telefonining oxirgi 4+ raqamini (masalan 4567) yozing — talon chiqadi, holatini va narxini shu yerdan o'zgartirasiz." });
     } else if (m.chat.type === 'private' && /^[\d\s+()№#-]{1,20}$/.test(text) && /\d/.test(text) && isAdmin(await settings(db), m.from?.id)) {
       await adminSearch(db, chat, text);
+    } else if (m.chat.type === 'private' && /^\/start\s+t\d{1,7}$/i.test(text)) {
+      // Talondagi QR koddan kelgan mijoz: holatini ko'rsatamiz, raqam ulanmagan bo'lsa ulashni taklif qilamiz
+      const talon = Number(text.replace(/\D/g, ''));
+      const r = await talonInfo(db, chat, talon);
+      const { data: cl } = await db.from('clients').select('phone').eq('tg_chat_id', chat).limit(1);
+      await tg('sendMessage', { chat_id: chat, text: r.text, ...(r.reply_markup ? { reply_markup: r.reply_markup } : {}) });
+      if (!cl?.length) {
+        await tg('sendMessage', { chat_id: chat, reply_markup: ASK_PHONE, text: "Qurilmangiz tayyor bo'lganda shu yerga xabar kelishi va narxini ko'rish uchun telefon raqamingizni yuboring 👇 (talondagi raqam bilan bir xil bo'lsin)" });
+      } else {
+        await tg('sendMessage', { chat_id: chat, reply_markup: MENU, text: "Qurilmangiz tayyor bo'lganda shu yerga xabar keladi ✅" });
+      }
     } else if (m.contact) {
       if (m.contact.user_id && m.contact.user_id !== m.from?.id) {
         await tg('sendMessage', { chat_id: chat, text: "Iltimos, o'zingizning raqamingizni tugma orqali yuboring." });

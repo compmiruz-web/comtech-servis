@@ -155,7 +155,7 @@ function labelModal(id){
 const PAYN={naqd:'Naqd',karta:'Karta',otkazma:"O'tkazma",nasiya:'Nasiya'};
 function receiptModal(sale){const c=S.company; const bl=sale.items[0]?.line||'kompyuter', bn=brandOf(bl);
   modal(`<h3>Sotuv cheki</h3><div class="ticket" ${tkAttr()}>
-  <div class="hd"><b>${esc(bn)}</b><br>${bn!==c.name?esc(c.name)+' · ':''}${esc(c.sub)}</div><hr>
+  <div class="hd"><b>${esc(bn)}</b><br>${bn!==c.name?esc(c.name)+' · ':''}${esc(c.sub)}</div>${ckText(S.printers.ckTop)}<hr>
   <div class="kv"><span>Sana:</span><span>${dts(sale.ts)}</span></div>
   <div class="kv"><span>Chek №:</span><span>${sale.no||''}</span></div>
   <div class="kv"><b>Chek berdi:</b><b>${esc(uName(sale.userId))}</b></div><hr>
@@ -166,7 +166,7 @@ function receiptModal(sale){const c=S.company; const bl=sale.items[0]?.line||'ko
   ${sale.pay==='nasiya'?(()=>{const d=S.cdebts.find(x=>x.saleId===sale.id); return d?`<div class="kv"><span>Mijoz:</span><span>${esc(d.name)}</span></div><div class="kv"><span>Tel:</span><span>${esc(d.phone)}</span></div>
     <div class="kv"><span>To'landi:</span><span>${fmt(d.paid)}</span></div><div class="kv" style="font-weight:800"><span>QARZ:</span><span>${fmt(d.amount-d.paid)} so'm</span></div>
     <div class="kv"><span>Muddat:</span><span>${dmy(d.due)}</span></div><div style="margin-top:14px">Mijoz imzosi: ____________</div><hr>`:''})():''}
-  ${[...new Set(sale.items.map(i=>i.line||'kompyuter'))].map(k=>contactsHtml(k)).join('<hr>')}<div class="c" style="margin-top:3px">Xaridingiz uchun rahmat!</div></div>
+  ${[...new Set(sale.items.map(i=>i.line||'kompyuter'))].map(k=>contactsHtml(k)).join('<hr>')}<div class="c" style="margin-top:3px">Xaridingiz uchun rahmat!</div>${ckText(S.printers.ckBottom)}</div>
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button>${printBtn('ticket')}</div>`);}
 const tgUrl=h=>h?'https://t.me/'+h.replace(/^@/,''):'';
 function qrSvg(text){try{const q=qrcode(0,'M');q.addData(text);q.make();return q.createSvgTag({cellSize:2,margin:0,scalable:true});}catch(e){return '';}}
@@ -533,10 +533,20 @@ function vUstaxona(){
     </tbody></table></div>
   </section>`;
 }
-function tkAttr(){const w=Math.min(120,Math.max(40,+S.printers.receiptW||80));return `data-w="${w>=70?80:58}" style="width:${w}mm"`;}
+function tkAttr(){const w=Math.min(120,Math.max(40,+S.printers.receiptW||80)), z=Math.min(2,Math.max(.6,+S.printers.receiptFont||1)), h=+S.printers.receiptH||0;return `data-w="${w>=70?80:58}" style="width:${w}mm;--tkz:${z}${h?`;min-height:${h}mm`:''}"`;}
+/* Chekka qo'shimcha matn (Sozlamalar → Printerlar) */
+const ckText=t=>String(t||'').trim()?`<div class="c ckx">${esc(String(t).trim()).replace(/\n/g,'<br>')}</div>`:'';
+const botName=()=>String(S.tg?.bot||'').replace(/^@/,'').trim();
+function talonBotHtml(r){
+  if(S.printers.tkBot===false) return '';
+  const b=botName(), ph=lineOf('servis').phone||'';
+  if(!b) return ph?`<hr><div class="c">Qurilmangiz holatini bilish uchun qo'ng'iroq qiling: <b>${esc(ph)}</b></div>`:'';
+  const url=`https://t.me/${b}?start=t${r.talon}`;
+  return `<hr><div class="tkbot"><div class="qr">${qrSvg(url)}</div><div><b>Qurilmangiz holatini Telegram'da biling:</b><br>QR kodni skanerlang yoki <b>@${esc(b)}</b> botiga talon raqamini yozing: <b>${tn(r.talon)}</b><br>Tayyor bo'lganda bot o'zi xabar beradi.${ph?`<br>Tel: ${esc(ph)}`:''}</div></div>`;
+}
 function ticketHtml(r){
   return `<div class="ticket" ${tkAttr()}>
-  <div class="hd"><b>${esc(brandOf('servis'))}</b><br>${esc(S.company.sub)}</div><hr>
+  <div class="hd"><b>${esc(brandOf('servis'))}</b><br>${esc(S.company.sub)}</div>${ckText(S.printers.ckTop)}<hr>
   <div class="tn"><span>TALON</span><span class="bigno">№${tn(r.talon)}</span></div>
   <div class="kv"><span>${dS(r.ts)}</span><span>${tS(r.ts)}</span></div>
   ${code128Svg('T'+r.talon,30)}<hr>
@@ -544,8 +554,8 @@ function ticketHtml(r){
   <span>Qurilma</span><span>${esc(r.device)} ${esc(r.model||'')}</span>${r.serial?`<span>S/N</span><span>${esc(r.serial)}</span>`:''}
   ${r.acc?`<span>Komplekt</span><span>${esc(r.acc)}</span>`:''}<span>Muammo</span><span>${esc(r.problem)}</span>
   ${r.feeUzs?`<span>Narx ~</span><span>${fmt(r.feeUzs)} so'm</span>`:''}
-  ${r.acceptedBy?`<span>Qabul qildi</span><span>${esc(uName(r.acceptedBy))}</span>`:''}${r.masterId?`<span>Usta</span><span>${esc(uName(r.masterId))}</span>`:''}</div><hr>
-  ${contactsHtml('servis')}<div class="c" style="margin-top:3px">Qurilmani olishda talonni ko'rsating</div></div>`;
+  ${r.acceptedBy?`<span>Qabul qildi</span><span>${esc(uName(r.acceptedBy))}</span>`:''}${r.masterId?`<span>Usta</span><span>${esc(uName(r.masterId))}</span>`:''}</div>
+  ${talonBotHtml(r)}<hr>${contactsHtml('servis')}<div class="c" style="margin-top:3px">Qurilmani olishda talonni ko'rsating</div>${ckText(S.printers.tkBottom)}</div>`;
 }
 function showTalon(t){
   const r=S.repairs.find(x=>x.talon===t); if(!r) return;
@@ -660,6 +670,14 @@ function vSozlamalar(){
     <label>Chek va talon printeri<input id="pr_r" value="${esc(S.printers.receipt)}"></label>
     <label>Chek qog'ozi eni (mm)<input id="pr_w" type="number" min="40" max="120" value="${esc(S.printers.receiptW)}" class="num" list="rwl"></label>
     <datalist id="rwl"><option value="80"><option value="58"><option value="57"><option value="76"></datalist>
+    <label>Chek qog'ozi bo'yi (mm, 0 — rulon)<input id="pr_h" type="number" min="0" max="300" value="${+S.printers.receiptH||0}" class="num"></label>
+    <div class="full row" style="gap:6px"><span class="small muted">Tayyor o'lcham:</span><button type="button" class="sm" data-ckpre="57x60">57 × 60</button><button type="button" class="sm" data-ckpre="58x0">58 rulon</button><button type="button" class="sm" data-ckpre="80x0">80 rulon</button></div>
+    <label>Chek va talon shrifti<select id="pr_font">${[['0.8','Juda kichik'],['0.9','Kichik'],['1','O\'rtacha'],['1.15','Katta'],['1.3','Juda katta'],['1.5','Eng katta']].map(([v,n])=>`<option value="${v}" ${String(+S.printers.receiptFont||1)===String(+v)?'selected':''}>${n}</option>`).join('')}</select></label>
+    <label class="full">Chek va talon tepasiga qo'shimcha matn<textarea id="pr_ckTop" rows="2" placeholder="Masalan: manzil, ish vaqti">${esc(S.printers.ckTop||'')}</textarea></label>
+    <label class="full">Sotuv cheki pastiga qo'shimcha matn<textarea id="pr_ckBottom" rows="2" placeholder="Masalan: Tovar 14 kun ichida almashtiriladi">${esc(S.printers.ckBottom||'')}</textarea></label>
+    <label class="full">Talon pastiga qo'shimcha matn<textarea id="pr_tkBottom" rows="2" placeholder="Masalan: 30 kundan ortiq olib ketilmagan qurilmaga javob bermaymiz">${esc(S.printers.tkBottom||'')}</textarea></label>
+    <label class="full row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" id="pr_tkBot" ${S.printers.tkBot!==false?'checked':''} style="width:auto"> Talonga Telegram bot QR kodi va "holatini bilish" yo'riqnomasi${botName()?` (@${esc(botName())})`:' (bot nomi Sozlamalar → Telegram\'da)'}</label>
+    <div class="full row"><button type="button" data-cktest>Namuna talonni ko'rish</button></div>
     <label>Etiketka va stiker printeri<input id="pr_l" value="${esc(S.printers.label)}"></label>
     <label>Etiketka eni × bo'yi (mm)<span class="row" style="flex-wrap:nowrap"><input id="pr_lw" type="number" min="20" max="120" value="${S.printers.labelW}" class="num"><span>×</span><input id="pr_lh" type="number" min="15" max="120" value="${S.printers.labelH}" class="num"></span></label>
     <label>Stiker eni × bo'yi (mm)<span class="row" style="flex-wrap:nowrap"><input id="pr_sw" type="number" min="20" max="120" value="${S.printers.stkW}" class="num"><span>×</span><input id="pr_sh" type="number" min="15" max="120" value="${S.printers.stkH}" class="num"></span></label>
@@ -669,6 +687,7 @@ function vSozlamalar(){
       <label>Yuborish vaqti<input id="tg_rt" type="time" value="${esc(S.tg.reportTime)}"></label>
       <label>Zaxira baza kanali (ID)<input id="tg_ch" value="${esc(S.tg.channel)}" class="num"></label>
       <label>Zaxira vaqti<input id="tg_bt" type="time" value="${esc(S.tg.backupTime)}"></label>
+      <label>Bot nomi (@...)<input id="tg_bot" value="${esc(S.tg.bot?'@'+botName():'')}" placeholder="@compmir_bot"></label>
       <label class="full">Botda boshqaruvchilar — Telegram ID (vergul bilan)<input id="tg_admins" value="${esc((S.tg.admins||[]).join(', '))}" class="num" placeholder="726304835"></label>
       <p class="full small muted" style="margin:0">Shu ID egalari botga talon raqami yoki telefonning oxirgi raqamlarini yozib, holat va narxni o'zgartira oladi. O'z ID'ingizni bilish: botga /id yozing.</p>
       <label class="full row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)"><input type="checkbox" id="tg_profit" ${S.tg.profit?'checked':''} style="width:auto"> Guruhga sof foydani ham yuborish</label>
@@ -1613,10 +1632,11 @@ document.addEventListener('submit', async (e) => {
     }
     if (id === 'prF') {
       const [lw, lh] = dims(v('pr_lw') + 'x' + v('pr_lh')), [sw, sh] = dims(v('pr_sw') + 'x' + v('pr_sh'));
-      await act(() => settingsUpd({ printers: { receipt: v('pr_r') || 'WP230', receiptW: String(Math.min(120, Math.max(40, +v('pr_w') || 80))), label: v('pr_l') || 'XP-365B', labelW: lw, labelH: lh, stkW: sw, stkH: sh } }), 'Printer sozlamalari saqlandi');
+      await act(() => settingsUpd({ printers: { receipt: v('pr_r') || 'WP230', ...S.printers, receiptW: String(Math.min(120, Math.max(40, +v('pr_w') || 80))), receiptH: String(Math.min(300, Math.max(0, Math.round(+v('pr_h') || 0)))), receiptFont: v('pr_font') || '1',
+        ckTop: v('pr_ckTop'), ckBottom: v('pr_ckBottom'), tkBottom: v('pr_tkBottom'), tkBot: document.getElementById('pr_tkBot').checked, label: v('pr_l') || 'XP-365B', labelW: lw, labelH: lh, stkW: sw, stkH: sh } }), 'Printer sozlamalari saqlandi');
     }
     if (id === 'tgF') {
-      await act(() => settingsUpd({ tg: { ...S.tg, admins: v('tg_admins').split(/[\s,;]+/).map((x) => x.trim()).filter((x) => /^\d+$/.test(x)), group: v('tg_group'), channel: v('tg_ch'), reportTime: v('tg_rt') || '21:00', backupTime: v('tg_bt') || '00:00', profit: document.getElementById('tg_profit').checked } }), 'Telegram sozlamalari saqlandi');
+      await act(() => settingsUpd({ tg: { ...S.tg, bot: v('tg_bot').replace(/^@/, '').replace(/^https?:\/\/t\.me\//, '').trim(), admins: v('tg_admins').split(/[\s,;]+/).map((x) => x.trim()).filter((x) => /^\d+$/.test(x)), group: v('tg_group'), channel: v('tg_ch'), reportTime: v('tg_rt') || '21:00', backupTime: v('tg_bt') || '00:00', profit: document.getElementById('tg_profit').checked } }), 'Telegram sozlamalari saqlandi');
     }
     if (id === 'rateF') {
       const nr = +v('rf_rate'); if (!(nr > 0)) return toast("Kursni to'g'ri kiriting");
@@ -1996,10 +2016,18 @@ document.addEventListener('click', async (e) => {
       const sale = S.sales.find((s) => s.id === res.id); if (sale) receiptModal(sale);
     }
     if (b.dataset.talon) showTalon(+b.dataset.talon);
+    if (b.dataset.ckpre) { const [w, h] = b.dataset.ckpre.split('x'); document.getElementById('pr_w').value = w; document.getElementById('pr_h').value = h; toast('O\'lcham tanlandi — "Saqlash"ni bosing'); }
+    if (b.hasAttribute('data-cktest')) {
+      // Saqlamasdan oldin ham namunani ko'rish: formadagi qiymatlar vaqtincha qo'llanadi
+      const keep = S.printers, f = (i) => document.getElementById(i);
+      S.printers = { ...keep, receiptW: f('pr_w').value, receiptH: f('pr_h').value, receiptFont: f('pr_font').value, ckTop: f('pr_ckTop').value, tkBottom: f('pr_tkBottom').value, tkBot: f('pr_tkBot').checked };
+      const r = S.repairs.slice().sort((a, b) => b.talon - a.talon)[0] || { talon: S.nextTalon || 1, ts: Date.now(), name: 'Namuna mijoz', phone: '+998 90 123 45 67', device: 'Noutbuk', model: 'Acer Aspire 5', problem: 'Yoqilmayapti', feeUzs: 0 };
+      try { modal(`<h3>Namuna talon</h3>${ticketHtml(r)}<div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button>${printBtn('ticket')}</div>`); } finally { S.printers = keep; }
+    }
     if (b.dataset.redit) editRepair(+b.dataset.redit);
     if (b.dataset.print) {
       const w = b.dataset.print;
-      if (w === 'ticket') printHtml(document.querySelector('.modal .ticket').outerHTML, +S.printers.receiptW || 80);
+      if (w === 'ticket') printHtml(document.querySelector('.modal .ticket').outerHTML, +S.printers.receiptW || 80, +S.printers.receiptH || 0);
       if (w === 'labels' && canStock()) { const pr = S.products.find((x) => x.id === document.getElementById('lbSheet')?.dataset.p), wn = +document.getElementById('lb_wn')?.value || 0, wu = document.getElementById('lb_wu')?.value || 'oy';
         if (pr && (!pr.warranty || +pr.warranty.n !== wn || pr.warranty.u !== wu)) { pr.warranty = { n: wn, u: wu }; db.rpc('product_set_extra', { p_id: pr.id, p: { warranty: { n: wn, u: wu } } }).then(() => {}, () => {}); } }
       if (w === 'labels') { const [lw, lh] = dims(readSize('lb')); const n = Math.min(200, Math.max(1, +document.getElementById('lb_n').value || 1)); const one1 = document.querySelector('#lbSheet .label').outerHTML; printHtml(Array(n).fill(one1).join(''), lw, lh); }
