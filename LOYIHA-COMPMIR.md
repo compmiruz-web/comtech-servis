@@ -9,7 +9,7 @@
   - **Servis (COMPMIR)** — Telegram/Instagram: @compmir
   - **NOUTBUK SAVDOSI** — Telegram @noutbuk_savdo, Instagram @noutbuk.savdo
   - **KOMPYUTER.UZ** (korpus, gaming, qismlar) — Telegram @kompyuterxon, Instagram @kompyuter.uz
-- Printerlar: **WP230** (chek, talon), **Xprinter XP-365B** (etiketka, yopishtirgich)
+- Printerlar: **XP-80** / WP230 (chek, talon), **Xprinter XP-365B** (etiketka, yopishtirgich)
 
 ## Dastur manzillari
 - Ishlaydigan sayt (doim oxirgi versiya): https://compmiruz-web.github.io/comtech-servis/
@@ -52,6 +52,7 @@
 - **Botda rahbar rejimi:** Sozlamalar → Telegram → "Botda boshqaruvchilar" (Telegram ID; rahbar: 726304835). Botga talon raqami yoki telefonning oxirgi 4+ raqamini yozsa talon chiqadi — holat tugmalari (Qabul / Diagnostika / Ta'mir / Tayyor / Topshirildi) va "💰 Narxni o'zgartirish". Tayyor'da narx bo'lmasa so'raydi
 - **Chek va talon sozlamalari** (Sozlamalar → Printerlar): qog'oz eni va bo'yi (tayyor: 57×60, 58 rulon, 80 rulon), shrift kattaligi (juda kichik … eng katta), tepaga / sotuv cheki pastiga / talon pastiga qo'shimcha matn, "Namuna talonni ko'rish"
 - **Talonda bot QR kodi:** skanerlansa `t.me/<bot>?start=t<talon>` — bot talon holatini ko'rsatadi va raqam ulashni so'raydi; bot nomi tick orqali avtomatik aniqlanadi (Sozlamalar → Telegram → "Bot nomi")
+- **Chekdan keyin qog'oz surish** (Sozlamalar → Printerlar, odatiy 15 mm) + "✂" kesish chizig'i — chek yirtish tishigacha o'zi chiqadi; avtomatik kesish XP-80 drayverida (Настройки печати → Paper Cut), yo'riqnoma dasturda
 
 ## Kelishuvlar
 - Javoblar o'zbek tilida
