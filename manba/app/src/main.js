@@ -865,67 +865,171 @@ function cpayReceipt(d, amount, pay){const c=S.company, left=d.amount-d.paid;
   <div class="kv"><b>Qabul qildi:</b><b>${esc(me().name)}</b></div><hr>${contactsHtml('servis')}</div>
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button>${printBtn('ticket')}</div>`);}
 
-/* ---------- QARZLAR (tovar qarzga olingan) ---------- */
-let dFilter='ochiq', dSearch='';
+/* ---------- QARZLAR (tovar qarzga olingan) — kimdan olingani bo'yicha bo'limlar ---------- */
+let dFilter='ochiq', dSearch='', dSup=null;
 const money=(v,cur)=>cur==='usd'?usd(v):fmt(v)+" so'm";
+const supKey=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+function supGroups(){
+  const g={};
+  for(const d of S.debts){const k=supKey(d.supplier); const b=(g[k]=g[k]||{key:k,name:d.supplier.trim(),phone:'',items:[],open:0,usd:0,uzs:0,noSum:0,handed:0,last:0});
+    b.items.push(d); if(!b.phone&&d.phone) b.phone=d.phone; if(d.ts>b.last){b.last=d.ts; b.name=d.supplier.trim();}
+    if(!d.closed){b.open++; if(d.amount==null) b.noSum++; else b[d.cur]+=d.amount-d.paid; if(d.handedTs) b.handed++;}}
+  return Object.values(g).sort((a,b)=>(b.open>0)-(a.open>0)||b.last-a.last);
+}
+function debtTalon(d){
+  if(!d.talon) return '';
+  const r=S.repairs.find(x=>x.talon===d.talon);
+  return `<div class="small" style="margin-top:3px">🔧 <b class="num">№${tn(d.talon)}</b>${r?` · ${esc(r.name||'')} · ${esc(r.device||'')} · <span class="status s-${r.status}" style="font-size:11px;padding:1px 8px">${stName(r.status)}</span>`:''}</div>`;
+}
 function vQarz(){
   if(!canDebt()) return `<section class="panel"><div class="lock">Qarz kiritish sizga yoqilmagan. Rahbardan ruxsat so'rang.</div></section>`;
-  const q=dSearch.toLowerCase();
-  let list=S.debts.slice().reverse();
-  if(dFilter==='ochiq') list=list.filter(d=>!d.closed); else if(dFilter==='yopiq') list=list.filter(d=>d.closed);
-  if(q) list=list.filter(d=>(d.supplier+' '+d.phone+' '+d.type+' '+d.name).toLowerCase().includes(q));
+  const G=supGroups();
+  if(dSup){const b=G.find(x=>x.key===dSup); if(b) return vQarzSup(b); dSup=null;}
+  const q=dSearch.toLowerCase().trim();
+  const list=G.filter(b=>!q||(b.name+' '+b.phone+' '+b.items.map(d=>d.name).join(' ')).toLowerCase().includes(q));
   const open=S.debts.filter(d=>!d.closed);
-  const leftUsd=open.filter(d=>d.cur==='usd').reduce((a,d)=>a+d.amount-d.paid,0), leftUzs=open.filter(d=>d.cur==='uzs').reduce((a,d)=>a+d.amount-d.paid,0);
-  const bySup={}; open.forEach(d=>{const k=d.supplier.trim().toLowerCase(); (bySup[k]=bySup[k]||{name:d.supplier,phone:d.phone,n:0,usd:0,uzs:0}); const b=bySup[k]; b.n++; b[d.cur]+=d.amount-d.paid; if(!b.phone&&d.phone)b.phone=d.phone;});
-  const sups=Object.values(bySup).sort((a,b)=>(b.usd*S.rate+b.uzs)-(a.usd*S.rate+a.uzs));
-  const today0=today();
-  return `<section class="panel"><h2>Qarzga tovar olish</h2><form id="debtF" class="form">
-    <label>Kimdan (firma yoki ism)<input id="d_sup" required list="supList" placeholder="Masalan: Ali optom"></label>
-    <datalist id="supList">${[...new Set(S.debts.map(d=>d.supplier))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
-    <label>Telefon raqami<input id="d_phone" inputmode="tel" placeholder="+998 90 123 45 67"></label>
-    <label>Tovar turi<input id="d_type" list="typeList" placeholder="SSD, noutbuk, korpus…"></label>
-    <datalist id="typeList">${[...new Set(S.debts.map(d=>d.type).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
-    <label class="full">Shtrix-kod <span class="muted small">(kiritilsa — tovar darhol omborga kirim bo'ladi)</span><span class="row" style="flex-wrap:nowrap"><input id="d_bar" inputmode="numeric" placeholder="Skanerlang yoki bo'sh qoldiring"><button type="button" class="sm" data-cam="d_bar" title="Kamera bilan skanerlash">📷</button><button type="button" class="sm" data-genbar="d_bar" title="Shtrix-kodi yo'q tovar uchun">Yaratish</button></span></label>
-    <label>Tovar nomi<input id="d_name" required placeholder="Kingston A400 240GB"></label>
-    <label>Bo'lim<span class="row" style="flex-wrap:nowrap"><select id="d_line" style="flex:1">${lineOptions('kompyuter')}</select>${lineAddBtn('d_line')}</span></label>
-    <label>Soni<input id="d_qty" type="number" min="1" value="1" required class="num"></label>
-    <label>Jami summa<input id="d_sum" type="number" min="0.01" step="any" required class="num"></label>
-    <label>Valyuta<select id="d_cur"><option value="usd">Dollar ($)</option><option value="uzs">So'm</option></select></label>
-    <label>Sotish narxi (1 dona, tanlangan valyutada)<input id="d_sell" type="number" min="0" step="any" class="num" placeholder="Shtrix-kod bo'lsa kerak"></label>
-    <label>To'lash muddati<input id="d_due" type="date"></label>
-    <label class="full">Izoh<input id="d_note" placeholder="ixtiyoriy"></label>
-    <div class="full row"><button class="pri">Qarzni yozish</button><span class="small muted" id="d_hint">Shtrix-kod kiritilsa tovar omborga qo'shiladi va sotuvda skanerlanadi; sotilganda ombordan o'zi ayriladi.</span></div></form></section>
-  ${owner()?`<section class="panel"><h2>Umumiy qarz</h2><div class="stats">
-    <div class="stat"><div class="k">Dollarda qarz</div><div class="v">${usd(leftUsd)}</div></div>
-    <div class="stat"><div class="k">So'mda qarz</div><div class="v">${fmt(leftUzs)}</div></div>
-    <div class="stat"><div class="k">Jami (kurs bo'yicha)</div><div class="v">${fmt(leftUsd*S.rate+leftUzs)}</div></div>
-    <div class="stat"><div class="k">Ochiq qarzlar</div><div class="v">${open.length}</div></div></div>
-    ${sups.length?`<div class="tbl" style="margin-top:14px"><table><thead><tr><th>Kimdan</th><th>Telefon</th><th class="r">Ochiq</th><th class="r">Qoldiq $</th><th class="r">Qoldiq so'm</th></tr></thead><tbody>
-    ${sups.map(b=>`<tr><td class="who">${esc(b.name)}</td><td class="num">${esc(b.phone)}</td><td class="r num">${b.n}</td><td class="r num">${b.usd?usd(b.usd):'—'}</td><td class="r num">${b.uzs?fmt(b.uzs):'—'}</td></tr>`).join('')}
-    </tbody></table></div>`:''}</section>`:''}
-  <section class="panel"><div class="row" style="margin-bottom:10px">
-    <select id="dFilter" style="width:auto"><option value="ochiq">Ochiq qarzlar</option><option value="yopiq">To'langanlar</option><option value="hammasi">Hammasi</option></select>
-    <input id="dSearch" placeholder="Kimdan, telefon, tovar…" value="${esc(dSearch)}" style="flex:1;min-width:160px"></div>
-    <div class="tbl"><table><thead><tr><th>Sana</th><th>Kimdan</th><th>Tovar</th><th class="r">Summa</th><th class="r">To'langan</th><th class="r">Qoldiq</th><th></th></tr></thead><tbody>
-    ${list.map(d=>{const left=d.amount-d.paid, late=!d.closed&&d.due&&d.due<today0;
-      return `<tr data-ts="${d.ts||0}"><td class="num small">${dts(d.ts)}${d.due?`<div class="small ${late?'':'muted'}" style="${late?'color:var(--bad)':''}">muddat ${d.due}</div>`:''}</td>
-      <td class="who">${esc(d.supplier)}<div class="small muted num">${esc(d.phone)}</div></td>
-      <td>${d.type?`<span class="chip" style="font-size:11px;padding:1px 8px">${esc(d.type)}</span> `:''}${esc(d.name)} <span class="muted">× ${d.qty}</span>${d.barcode?` <span class="chip ok" style="font-size:11px;padding:1px 8px" title="Shtrix-kod ${esc(d.barcode)}">📦 omborga kirdi</span>`:''}${d.note?`<div class="small muted">${esc(d.note)}</div>`:''}${owner()?`<div class="small muted">kiritdi: ${esc(uName(d.userId))}</div>`:''}</td>
-      <td class="r num">${money(d.amount,d.cur)}</td><td class="r num">${money(d.paid,d.cur)}</td>
-      <td class="r num">${d.closed?'<span class="status s-tayyor">To\'langan</span>':`<b>${money(left,d.cur)}</b>`}</td>
-      <td>${owner()?`<div class="row" style="flex-wrap:nowrap">${d.closed?'':`<button class="sm pri" data-paydebt="${d.id}">To'lash</button>`}<button class="sm ghost" data-deldebt="${d.id}" aria-label="O'chirish">✕</button></div>`:''}</td></tr>`}).join('')||'<tr><td colspan="7" class="muted">Qarz yo\'q</td></tr>'}
-    </tbody></table></div></section>`;
+  const tUsd=open.filter(d=>d.cur==='usd'&&d.amount!=null).reduce((a,d)=>a+d.amount-d.paid,0), tUzs=open.filter(d=>d.cur==='uzs'&&d.amount!=null).reduce((a,d)=>a+d.amount-d.paid,0);
+  return `<section class="panel"><div class="row" style="gap:8px;flex-wrap:wrap">
+      <button type="button" class="pri" data-dnew="">➕ Qarzga tovar olish</button>
+      <input id="dSearch" placeholder="Qidirish: kimdan, telefon, tovar…" value="${esc(dSearch)}" style="flex:1;min-width:180px"></div>
+    <div class="stats" style="margin-top:14px">
+      <div class="stat"><div class="k">Ochiq tovarlar</div><div class="v">${open.length}</div></div>
+      <div class="stat"><div class="k">Dollarda qarz</div><div class="v">${usd(tUsd)}</div></div>
+      <div class="stat"><div class="k">So'mda qarz</div><div class="v">${fmt(tUzs)}</div></div>
+      <div class="stat"><div class="k">Summasi yozilmagan</div><div class="v">${open.filter(d=>d.amount==null).length}</div></div></div></section>
+  <section class="panel"><h2>Kimlardan olingan</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px">
+    ${list.map(b=>`<button type="button" data-dsup="${esc(b.key)}" style="text-align:left;display:block;padding:14px;border-radius:14px;border:1px solid var(--line);background:${b.open?'var(--panel)':'transparent'};opacity:${b.open?1:.65};height:auto;white-space:normal">
+      <div style="font-weight:700;font-size:16px">${esc(b.name)}</div>
+      ${b.phone?`<div class="small muted num">${esc(b.phone)}</div>`:''}
+      <div class="small" style="margin-top:8px;line-height:1.7">${b.open?`📦 <b>${b.open}</b> ta tovar qarzda${b.handed?` · ✅ ${b.handed} ta topshirilgan`:''}<br>
+        ${b.usd?`💵 <b class="num">${usd(b.usd)}</b> `:''}${b.uzs?`💵 <b class="num">${fmt(b.uzs)} so'm</b> `:''}${b.noSum?`<span class="muted">· ${b.noSum} ta summasiz</span>`:''}${!b.usd&&!b.uzs&&!b.noSum?'':''}`:'<span class="muted">✔ Hammasi berilgan</span>'}
+        <br><span class="muted">Oxirgi: ${dts(b.last)}</span></div></button>`).join('')||'<p class="muted">Hali qarzga tovar olinmagan.</p>'}
+    </div></section>`;
 }
-function payDebtModal(id){
-  const d=S.debts.find(x=>x.id===id), left=d.amount-d.paid;
-  const hist=S.debtPays.filter(p=>p.debtId===id);
-  modal(`<h3>${esc(d.supplier)}: qarzni to'lash</h3>
-  <p class="muted" style="margin:0">${esc(d.name)} × ${d.qty} · qoldiq <b>${money(left,d.cur)}</b></p>
-  ${hist.length?`<div class="small">${hist.map(p=>`<div class="kv" style="display:flex;justify-content:space-between"><span class="muted">${dts(p.ts)}${p.note?' · '+esc(p.note):''}</span><span class="num">${money(p.amount,d.cur)}</span></div>`).join('')}</div>`:''}
-  <form id="payDebtF" data-d="${d.id}" style="display:grid;gap:10px">
-    <label>To'lov summasi (${d.cur==='usd'?'$':"so'm"})<input id="pd_sum" type="number" min="0.01" step="any" max="${left}" value="${left}" required class="num"></label>
-    <label>Izoh<input id="pd_note" placeholder="naqd, karta…"></label>
-    <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">To'lash</button></div></form>`);
+function vQarzSup(b){
+  const today0=today();
+  let list=b.items.slice().sort((x,y)=>y.ts-x.ts);
+  if(dFilter==='ochiq') list=list.filter(d=>!d.closed); else if(dFilter==='berilgan') list=list.filter(d=>d.closed);
+  const pays=(S.spays||[]).filter(p=>supKey(p.supplier)===b.key);
+  const oldPays=S.debtPays.filter(p=>b.items.some(d=>d.id===p.debtId));
+  const nHist=pays.length+oldPays.length;
+  const nClosed=b.items.filter(d=>d.closed).length;
+  const F=[['ochiq',`Qarzdagilar (${b.open})`],['berilgan',`Qarzi berilganlar (${nClosed})`],['hammasi','Hammasi']];
+  return `<section class="panel">
+    <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="sm" data-dback="1">← Barchasi</button>
+      <div style="flex:1;min-width:160px"><h2 style="margin:0">${esc(b.name)}</h2>${b.phone?`<a class="small num" href="tel:${esc(b.phone.replace(/\s/g,''))}">${esc(b.phone)}</a>`:''}</div>
+      <button type="button" class="sm" data-dhist="${esc(b.key)}" title="Berilgan qarzlar tarixi">🕘 Tarix${nHist?` (${nHist})`:''}</button>
+      <button type="button" class="sm" data-dnew="${esc(b.name)}">➕ Tovar qo'shish</button>
+      ${b.open?`<button type="button" class="sm pri" data-dpay="${esc(b.key)}">💵 Qarzni berish</button>`:''}</div>
+    <div class="row small" style="gap:8px;margin-top:12px;flex-wrap:wrap">
+      <span class="chip">📦 Qarzda: <b>${b.open}</b> ta</span>${b.usd?`<span class="chip">💵 <b class="num">${usd(b.usd)}</b></span>`:''}${b.uzs?`<span class="chip">💵 <b class="num">${fmt(b.uzs)} so'm</b></span>`:''}${b.noSum?`<span class="chip warn">${b.noSum} ta summasiz</span>`:''}${b.handed?`<span class="chip" style="background:var(--info-soft);color:var(--info)">✅ ${b.handed} ta topshirilgan</span>`:''}</div></section>
+  <section class="panel">
+    <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:12px">${F.map(([k,n])=>`<button type="button" class="sm ${dFilter===k?'pri':''}" data-dflt="${k}">${n}</button>`).join('')}</div>
+    <div style="display:grid;gap:10px">
+    ${list.map(d=>{const late=!d.closed&&d.due&&d.due<today0;
+      const st=d.closed?['var(--accent-soft)','var(--ok)']:d.handedTs?['var(--info-soft)','var(--info)']:late?['var(--bad-soft)','var(--bad)']:['transparent','var(--warn)'];
+      return `<div data-ts="${d.ts||0}" style="border:1px solid var(--line);border-left:5px solid ${st[1]};background:${st[0]};border-radius:12px;padding:12px 14px;${d.closed?'opacity:.85':''}">
+        <div class="row" style="justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:nowrap">
+          <div style="min-width:0">${d.type?`<span class="chip" style="font-size:11px;padding:1px 8px">${esc(d.type)}</span> `:''}<b style="font-size:16px">${esc(d.name)}</b> <span class="muted">× ${d.qty}</span>${d.barcode?` <span class="chip ok" style="font-size:11px;padding:1px 8px" title="Shtrix-kod ${esc(d.barcode)}">📦 omborda</span>`:''}
+            <div class="small muted num" style="margin-top:2px">🗓 ${dts(d.ts)} · kiritdi: ${esc(uName(d.userId))}${d.due?` · <span style="${late?'color:var(--bad);font-weight:600':''}">muddat ${d.due}</span>`:''}</div>
+            ${debtTalon(d)}${d.note?`<div class="small muted">${esc(d.note)}</div>`:''}</div>
+          <div class="r num" style="white-space:nowrap;text-align:right">${d.amount==null?(d.closed?'<span class="muted small">summasiz</span>':`<button type="button" class="sm" data-damt="${d.id}">+ Summa</button>`):`<b style="font-size:16px">${money(d.amount,d.cur)}</b>${d.paid&&!d.closed?`<div class="small muted">to'langan ${money(d.paid,d.cur)}</div>`:''}`}</div></div>
+        <div class="row" style="justify-content:space-between;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+          <div class="row" style="gap:6px;flex-wrap:wrap">${d.closed?`<span class="chip ok" style="font-size:12px">💵 Qarzi berilgan · <span class="num">${dts(d.closedTs)}</span></span>`:'<span class="chip warn" style="font-size:12px">⏳ Qarzda</span>'}
+            ${d.handedTs?`<span class="chip" style="font-size:12px;background:var(--info);color:#fff">✅ Topshirildi · <span class="num">${dts(d.handedTs)}</span></span>`:''}</div>
+          <div class="row" style="flex-wrap:nowrap;gap:4px">
+            ${d.closed?'':`<button type="button" class="sm ${d.handedTs?'':'pri'}" data-dhand="${d.id}" title="${d.handedTs?'Topshirildi belgisini olib tashlash':'Mijoz olib ketdi / ishlatildi'}">${d.handedTs?'↩︎ Bekor':'✅ Topshirildi'}</button>`}
+            ${owner()||(d.amount==null&&!d.closed)?`<button type="button" class="sm" data-damt="${d.id}" title="Tahrirlash">✎</button>`:''}
+            ${owner()?`<button type="button" class="sm ghost" data-deldebt="${d.id}" aria-label="O'chirish">✕</button>`:''}</div></div></div>`;}).join('')||'<p class="muted">Bu ro\'yxatda tovar yo\'q</p>'}
+    </div>
+    <div class="row small" style="gap:14px;margin-top:12px;flex-wrap:wrap"><span><i style="display:inline-block;width:5px;height:12px;background:var(--warn)"></i> Qarzda</span><span><i style="display:inline-block;width:5px;height:12px;background:var(--info)"></i> Topshirilgan (mijoz olib ketgan)</span><span><i style="display:inline-block;width:5px;height:12px;background:var(--ok)"></i> Qarzi berilgan</span><span><i style="display:inline-block;width:5px;height:12px;background:var(--bad)"></i> Muddati o'tgan</span></div></section>`;
+}
+function debtModal(sup){
+  const sups=[...new Set(S.debts.map(d=>d.supplier.trim()))];
+  const reps=S.repairs.filter(r=>r.status!=='berildi').sort((a,b)=>b.talon-a.talon).slice(0,300);
+  const ph=sup?(S.debts.find(d=>supKey(d.supplier)===supKey(sup)&&d.phone)||{}).phone||'':'';
+  modal(`<h3>Qarzga tovar olish</h3><form id="debtF" class="form">
+    <label>Kimdan (firma yoki ism)<input id="d_sup" required list="supList" value="${esc(sup||'')}" placeholder="Masalan: Muhammadyusuf Alo servis"></label>
+    <datalist id="supList">${sups.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+    <label>Telefon raqami<input id="d_phone" inputmode="tel" value="${esc(ph)}" placeholder="ixtiyoriy"></label>
+    <label>Tovar nomi<input id="d_name" required placeholder="Kingston A400 240GB"></label>
+    <label>Soni<input id="d_qty" type="number" min="1" step="1" value="1" required class="num"></label>
+    <label>Summa <span class="muted small" style="text-transform:none;letter-spacing:0">(ixtiyoriy)</span><input id="d_sum" type="number" min="0" step="any" class="num" placeholder="Bilmasangiz bo'sh qoldiring"></label>
+    <label>Valyuta<select id="d_cur"><option value="usd">Dollar ($)</option><option value="uzs">So'm</option></select></label>
+    <label class="full">Servis mijozi uchun bo'lsa — talon raqami <span class="muted small" style="text-transform:none;letter-spacing:0">(ixtiyoriy; mijoz qurilmasini olib ketganda "Topshirildi" o'zi qo'yiladi)</span>
+      <input id="d_talon" list="talList" inputmode="numeric" placeholder="Masalan: 1250"></label>
+    <datalist id="talList">${reps.map(r=>`<option value="${r.talon}">№${tn(r.talon)} · ${esc(r.name||'')} · ${esc(r.device||'')} ${esc(r.model||'')}</option>`).join('')}</datalist>
+    <details class="full"><summary class="small" style="cursor:pointer">Omborga kirim qilish (shtrix-kod, bo'lim, sotish narxi), muddat</summary>
+      <div class="form" style="margin-top:10px">
+      <label class="full">Shtrix-kod <span class="muted small" style="text-transform:none;letter-spacing:0">(kiritilsa — tovar darhol omborga kirim bo'ladi)</span><span class="row" style="flex-wrap:nowrap"><input id="d_bar" inputmode="numeric" placeholder="Skanerlang yoki bo'sh qoldiring"><button type="button" class="sm" data-cam="d_bar" title="Kamera bilan skanerlash">📷</button><button type="button" class="sm" data-genbar="d_bar">Yaratish</button></span></label>
+      <label>Bo'lim<select id="d_line">${lineOptions('kompyuter')}</select></label>
+      <label>Sotish narxi (1 dona, tanlangan valyutada)<input id="d_sell" type="number" min="0" step="any" class="num" placeholder="Shtrix-kod bo'lsa kerak"></label>
+      <label>Tovar turi<input id="d_type" list="typeList" placeholder="SSD, ekran…"></label>
+      <datalist id="typeList">${[...new Set(S.debts.map(d=>d.type).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+      <label>To'lash muddati<input id="d_due" type="date"></label></div></details>
+    <label class="full">Izoh<input id="d_note" placeholder="ixtiyoriy"></label>
+    <div class="full row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Yozish</button></div></form>`);
+  setTimeout(()=>document.getElementById(sup?'d_name':'d_sup')?.focus(),50);
+}
+function debtEditModal(id){
+  const d=S.debts.find(x=>x.id===id); if(!d) return;
+  const own=owner(), canSum=own||d.amount==null;
+  modal(`<h3>${esc(d.name)} × ${d.qty}</h3><p class="small muted" style="margin:0">${esc(d.supplier)} · olingan ${dts(d.ts)}</p>
+  <form id="damtF" data-d="${d.id}" class="form">
+    ${own?`<label>Kimdan<input id="da_sup" value="${esc(d.supplier)}" required></label><label>Telefon<input id="da_phone" value="${esc(d.phone)}"></label>
+      <label>Tovar nomi<input id="da_name" value="${esc(d.name)}" required></label><label>Soni<input id="da_qty" type="number" min="1" step="1" value="${d.qty}" class="num"></label>`:''}
+    ${canSum?`<label>Summa<input id="da_sum" type="number" min="0" step="any" value="${d.amount??''}" class="num" placeholder="Bo'sh — summasiz"></label>
+      <label>Valyuta<select id="da_cur"><option value="usd" ${d.cur==='usd'?'selected':''}>Dollar ($)</option><option value="uzs" ${d.cur==='uzs'?'selected':''}>So'm</option></select></label>`:''}
+    <label>Talon raqami (servis mijozi)<input id="da_talon" list="talList2" value="${d.talon||''}" inputmode="numeric" placeholder="ixtiyoriy"></label>
+    <datalist id="talList2">${S.repairs.slice(-300).reverse().map(r=>`<option value="${r.talon}">№${tn(r.talon)} · ${esc(r.name||'')} · ${esc(r.device||'')}</option>`).join('')}</datalist>
+    ${own?`<label class="full">Izoh<input id="da_note" value="${esc(d.note)}"></label>`:''}
+    <div class="full row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div></form>`);
+}
+function supPayModal(key){
+  const b=supGroups().find(x=>x.key===key); if(!b) return;
+  const items=b.items.filter(d=>!d.closed).sort((x,y)=>x.ts-y.ts);
+  modal(`<h3>💵 Qarzni berish — ${esc(b.name)}</h3>
+  <form id="spayF" data-k="${esc(key)}" style="display:grid;gap:10px">
+    <p class="small muted" style="margin:0">Qaysi tovarlar uchun berilyapti — belgilang (belgilanganlar "Qarzi berilgan" bo'ladi):</p>
+    <div style="max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:6px 10px">
+      <label class="row" style="flex-wrap:nowrap;gap:8px;text-transform:none;letter-spacing:0;color:var(--fg);font-size:14px;border-bottom:1px solid var(--line);padding:6px 0"><input type="checkbox" id="sp_all" checked style="width:auto"> <b>Hammasini belgilash</b></label>
+      ${items.map(d=>`<label class="row" style="flex-wrap:nowrap;gap:8px;text-transform:none;letter-spacing:0;color:var(--fg);font-size:14px;padding:6px 0;align-items:flex-start">
+        <input type="checkbox" class="sp_chk" value="${d.id}" data-a="${d.amount??''}" data-c="${d.cur}" checked style="width:auto;margin-top:3px">
+        <span style="flex:1">${esc(d.name)} × ${d.qty}<br><span class="small muted num">${dts(d.ts)}${d.handedTs?' · ✅ topshirilgan':''}</span></span>
+        <span class="num small" style="white-space:nowrap">${d.amount==null?'<span class="muted">summasiz</span>':money(d.amount-d.paid,d.cur)}</span></label>`).join('')}
+    </div>
+    <div class="small" id="sp_sum"></div>
+    <div class="form"><label>Berilgan summa <span class="muted small" style="text-transform:none;letter-spacing:0">(ixtiyoriy)</span><input id="sp_amt" type="number" min="0" step="any" class="num"></label>
+      <label>Valyuta<select id="sp_cur"><option value="usd">Dollar ($)</option><option value="uzs">So'm</option></select></label>
+      <label class="full">Izoh<input id="sp_note" placeholder="naqd, karta, tovar qaytarildi…"></label></div>
+    <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Qarzni berdim</button></div></form>`);
+  spRecalc(true);
+}
+function spRecalc(fill){
+  const ch=[...document.querySelectorAll('.sp_chk')].filter(x=>x.checked);
+  const s={usd:0,uzs:0}; let none=0; ch.forEach(x=>{if(x.dataset.a==='') none++; else s[x.dataset.c]+=+x.dataset.a;});
+  const box=document.getElementById('sp_sum'); if(!box) return;
+  box.innerHTML=`Belgilangan: <b>${ch.length}</b> ta tovar${s.usd?` · <b class="num">${usd(s.usd)}</b>`:''}${s.uzs?` · <b class="num">${fmt(s.uzs)} so'm</b>`:''}${none?` · <span class="muted">${none} ta summasiz</span>`:''}`;
+  const all=document.getElementById('sp_all'); if(all) all.checked=ch.length===document.querySelectorAll('.sp_chk').length;
+  if(fill){const a=document.getElementById('sp_amt'), c=document.getElementById('sp_cur');
+    if(s.usd&&!s.uzs){a.value=+s.usd.toFixed(2); c.value='usd';} else if(s.uzs&&!s.usd){a.value=s.uzs; c.value='uzs';} else a.value='';}
+}
+function supHistModal(key){
+  const b=supGroups().find(x=>x.key===key); if(!b) return;
+  const pays=(S.spays||[]).filter(p=>supKey(p.supplier)===key).map(p=>({...p,kind:'new'}));
+  const old=S.debtPays.filter(p=>b.items.some(d=>d.id===p.debtId)).map(p=>{const d=b.items.find(x=>x.id===p.debtId); return {id:p.id,ts:p.ts,amount:p.amount,cur:d.cur,note:p.note,items:[{name:d.name,qty:d.qty}],kind:'old'};});
+  const all=[...pays,...old].sort((x,y)=>y.ts-x.ts);
+  const tot={usd:0,uzs:0}; all.forEach(p=>{if(p.amount) tot[p.cur]+=p.amount;});
+  modal(`<h3>🕘 ${esc(b.name)} — berilgan qarzlar</h3>
+  <p class="small muted" style="margin:0">Jami berilgan: ${tot.usd?`<b class="num">${usd(tot.usd)}</b> `:''}${tot.uzs?`<b class="num">${fmt(tot.uzs)} so'm</b>`:''}${!tot.usd&&!tot.uzs?'—':''} · ${all.length} ta yozuv</p>
+  <div style="display:grid;gap:8px;max-height:60vh;overflow:auto">
+  ${all.map(p=>`<div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px">
+    <div class="row" style="justify-content:space-between;gap:8px"><b class="num">${dts(p.ts)}</b><b class="num">${p.amount?money(p.amount,p.cur):'<span class="muted">summasiz</span>'}</b></div>
+    <div class="small" style="margin-top:4px">${(p.items||[]).map(i=>`• ${esc(i.name)} × ${i.qty}`).join('<br>')||'<span class="muted">tovar belgilanmagan</span>'}</div>
+    <div class="small muted" style="margin-top:4px">${p.note?esc(p.note)+' · ':''}${p.userId?'berdi: '+esc(uName(p.userId)):''}</div>
+    ${owner()&&p.kind==='new'?`<div class="row" style="justify-content:flex-end;margin-top:4px"><button type="button" class="sm ghost" data-spundo="${p.id}">Bekor qilish</button></div>`:''}</div>`).join('')||'<p class="muted">Hali qarz berilmagan.</p>'}
+  </div><div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button></div>`);
 }
 
 /* ---------- RASXODLAR ---------- */
@@ -1386,7 +1490,7 @@ async function refresh() {
   const dpays = debtIds.length ? await must(db.from('debt_payments').select('*').in('debt_id', debtIds).order('created_at')) : [];
   const isOwn = profs.some((p) => p.id === uid && p.role === 'owner');
   const soft = (pr) => Promise.resolve(pr).then((r) => (r.error ? [] : r.data || []), () => []);
-  const [salPays, notifs, monthR, moves, vendDevs, vendInc, chPosts] = await Promise.all([
+  const [salPays, notifs, monthR, moves, vendDevs, vendInc, chPosts, spays] = await Promise.all([
     soft(db.from('expenses').select('*').eq('cat', 'oylik').order('created_at', { ascending: false }).limit(1000)),
     isOwn ? soft(db.from('notifications').select('*').order('created_at', { ascending: false }).limit(150)) : Promise.resolve([]),
     isOwn ? Promise.resolve(db.rpc('month_summary', { p_month: today().slice(0, 7) })).catch(() => ({ data: null })) : Promise.resolve({ data: null }),
@@ -1394,6 +1498,7 @@ async function refresh() {
     isOwn ? soft(db.from('vend_devices').select('*').order('created_at')) : Promise.resolve([]),
     isOwn ? soft(db.from('vend_income').select('id,created_at,device_id,amount_uzs').gte('created_at', since).order('created_at').limit(20000)) : Promise.resolve([]),
     soft(db.from('channel_posts').select('id,created_at,product_id,posted_at,error').order('created_at', { ascending: false }).limit(300)),
+    soft(db.from('supplier_payments').select('*').order('created_at', { ascending: false }).limit(2000)),
   ]);
   if (S?.notifs && isOwn) {
     const known = new Set(S.notifs.map((n) => n.id + ':' + n.ts));
@@ -1426,7 +1531,9 @@ async function refresh() {
     expenses: exps.map((e) => ({ id: e.id, ts: ms(e.created_at), userId: e.user_id, cat: e.cat, amountUzs: +e.amount_uzs, note: e.note || '', toUser: e.to_user })),
     payroll: Object.fromEntries((pr.data || []).map((x) => [x.user_id, x])),
     debts: debts.map((d) => ({ id: d.id, ts: ms(d.created_at), userId: d.user_id, supplier: d.supplier, phone: d.phone || '', type: d.item_type || '',
-      name: d.item_name, qty: d.qty, amount: +d.amount, cur: d.currency, due: d.due_date, note: d.note || '', paid: +d.paid, closed: d.closed, barcode: d.barcode || '', productId: d.product_id })),
+      name: d.item_name, qty: d.qty, amount: d.amount == null ? null : +d.amount, cur: d.currency, due: d.due_date, note: d.note || '', paid: +d.paid, closed: d.closed, barcode: d.barcode || '', productId: d.product_id,
+      talon: d.repair_talon || null, handedTs: ms(d.handed_at), closedTs: ms(d.closed_at || (d.closed ? d.created_at : null)) })),
+    spays: spays.map((p) => ({ id: p.id, ts: ms(p.created_at), userId: p.user_id, supplier: p.supplier, amount: p.amount == null ? null : +p.amount, cur: p.currency, note: p.note || '', items: p.items || [] })),
     returns: rets.map(mapReturn),
     credit: st.credit || { days: 30, limit: 0, remindDays: 3 },
     discount: st.discount || { noutbuk: 5, kompyuter: 5, servis: 10 },
@@ -1746,14 +1853,26 @@ document.addEventListener('submit', async (e) => {
       await act(() => settingsUpd({ credit: { days: +v('cs_days') || 30, limit: +v('cs_limit') || 0, remindDays: +v('cs_rem') || 0 } }), 'Nasiya sozlamalari saqlandi');
     }
     if (id === 'debtF') {
-      const bar = v('d_bar').trim(), q = +v('d_qty') || 1;
-      await act(() => db.rpc('debt_stock_in', { p: { supplier: v('d_sup'), phone: v('d_phone'), type: v('d_type'), name: v('d_name'), line: v('d_line'),
-        qty: q, amount: +v('d_sum'), currency: v('d_cur'), due: v('d_due'), note: v('d_note'), barcode: bar, sell: v('d_sell') } }).then(must0),
+      const bar = v('d_bar').trim(), q = +v('d_qty') || 1, sup = v('d_sup').trim();
+      const r = await act(() => db.rpc('debt_stock_in', { p: { supplier: sup, phone: v('d_phone'), type: v('d_type'), name: v('d_name'), line: v('d_line'),
+        qty: q, amount: v('d_sum'), currency: v('d_cur'), due: v('d_due'), note: v('d_note'), barcode: bar, sell: v('d_sell'), talon: v('d_talon') } }).then(must0),
         bar ? `Qarz yozildi va omborga +${q} dona kirim qilindi` : 'Qarz yozildi');
+      if (r) { closeModal(); dSup = supKey(sup); dFilter = 'ochiq'; render(); }
     }
-    if (id === 'payDebtF') {
-      await act(() => must(db.from('debt_payments').insert({ debt_id: e.target.dataset.d, user_id: S.cur, amount: +v('pd_sum'), note: v('pd_note') })), "To'lov yozildi");
-      closeModal();
+    if (id === 'damtF') {
+      const did = e.target.dataset.d, p = {};
+      const val = (x) => document.getElementById(x);
+      if (val('da_sum')) { p.amount = v('da_sum'); p.currency = v('da_cur'); }
+      p.talon = v('da_talon');
+      if (val('da_sup')) Object.assign(p, { supplier: v('da_sup'), phone: v('da_phone'), name: v('da_name'), qty: v('da_qty'), note: v('da_note') });
+      const ok = await act(() => db.rpc('debt_update', { p_id: did, p }).then(must0).then(() => true), 'Saqlandi');
+      if (ok) closeModal();
+    }
+    if (id === 'spayF') {
+      const key = e.target.dataset.k, b = supGroups().find((x) => x.key === key);
+      const items = [...document.querySelectorAll('.sp_chk')].filter((x) => x.checked).map((x) => x.value);
+      const ok = await act(() => db.rpc('supplier_pay', { p_supplier: b.name, p_items: items, p_amount: v('sp_amt') === '' ? null : +v('sp_amt'), p_currency: v('sp_cur'), p_note: v('sp_note') }).then(must0).then(() => true), "Qarz berildi — tarixga yozildi");
+      if (ok) closeModal();
     }
     if (id === 'impClF') {
       const rows = v('imp_txt').split('\n').map((l) => l.split(/[;,\t]/).map((x) => x.trim())).filter((r) => r[0] && r[1]);
@@ -1806,6 +1925,8 @@ document.addEventListener('change', async (e) => {
     if (t.id === 'rFilter') { rFilter = t.value; render(); }
     if (t.id === 'eMonth') { eMonth = t.value; render(); }
     if (t.id === 'dFilter') { dFilter = t.value; render(); }
+    if (t.id === 'sp_all') { document.querySelectorAll('.sp_chk').forEach((x) => (x.checked = t.checked)); spRecalc(true); }
+    if (t.classList?.contains('sp_chk')) spRecalc(true);
     if (t.id === 'nFilter') { nFilter = t.value; render(); }
     if (t.id === 'salMon') { salMon = t.value; keepScroll(render); }
     if (t.id === 'k_cur') setKCur(t.value);
@@ -1960,7 +2081,16 @@ document.addEventListener('click', async (e) => {
     }
     if (b.dataset.genbar) { const el = document.getElementById(b.dataset.genbar); if (el) { el.value = genBarcode(); el.dispatchEvent(new Event('input', { bubbles: true })); document.getElementById('d_name')?.focus(); } }
     if (b.id === 'genBar') { document.getElementById('k_bar').value = genBarcode(); document.getElementById('k_name').focus(); }
-    if (b.dataset.paydebt) payDebtModal(b.dataset.paydebt);
+    if (b.dataset.dnew !== undefined) debtModal(b.dataset.dnew);
+    if (b.dataset.dsup) { dSup = b.dataset.dsup; dFilter = 'ochiq'; window.scrollTo(0, 0); render(); }
+    if (b.dataset.dback) { dSup = null; render(); }
+    if (b.dataset.dflt) { dFilter = b.dataset.dflt; keepScroll(render); }
+    if (b.dataset.dpay) supPayModal(b.dataset.dpay);
+    if (b.dataset.dhist) supHistModal(b.dataset.dhist);
+    if (b.dataset.damt) debtEditModal(b.dataset.damt);
+    if (b.dataset.dhand) { const d = S.debts.find((x) => x.id === b.dataset.dhand); await act(() => db.rpc('debt_update', { p_id: d.id, p: { handed: !d.handedTs } }).then(must0), d.handedTs ? 'Belgi olib tashlandi' : 'Topshirildi deb belgilandi'); }
+    if (b.dataset.spundo) { const id = b.dataset.spundo; modal(`<h3>To'lov bekor qilinsinmi?</h3><p class="muted" style="margin:0">Belgilangan tovarlar yana "Qarzda" bo'ladi.</p><div class="row" style="justify-content:flex-end"><button type="button" data-close>Yo'q</button><button class="pri" data-spundoyes="${id}">Ha, bekor qilish</button></div>`); }
+    if (b.dataset.spundoyes) { await act(() => db.rpc('supplier_pay_undo', { p_id: b.dataset.spundoyes }).then(must0), "To'lov bekor qilindi"); closeModal(); }
     if (b.id === 'credChip') { nFilter = 'otgan'; location.hash = 'nasiya'; }
     if (b.dataset.cpay) cpayModal(b.dataset.cpay);
     if (b.dataset.cdue) {

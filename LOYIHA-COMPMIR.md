@@ -19,7 +19,7 @@
 
 ## Tuzilishi
 - Ilova: Vite + oddiy JavaScript (`manba/app/src/main.js`), PWA — Android, iOS, kompyuterda ishlaydi
-- Baza o'zgarishlari: `manba/supabase/migrations/0001 … 0021` (0021 — ustaxona nazorati)
+- Baza o'zgarishlari: `manba/supabase/migrations/0001 … 0022` (0021 — ustaxona nazorati, 0022 — qarz bo'limlari)
 - Server funksiyalari (Supabase Edge): `tick` (har 5 daqiqada), `tg-bot` (Telegram bot), `admin-users`
   - Dashboard uchun bitta faylli nusxalar: `manba/deploy/tick.ts`, `manba/deploy/tg-bot.ts`
   - "Verify JWT" o'chiq turishi shart
@@ -53,6 +53,13 @@
 - **Chek va talon sozlamalari** (Sozlamalar → Printerlar): qog'oz eni va bo'yi (tayyor: 57×60, 58 rulon, 80 rulon), shrift kattaligi (juda kichik … eng katta), tepaga / sotuv cheki pastiga / talon pastiga qo'shimcha matn, "Namuna talonni ko'rish"
 - **Talonda bot QR kodi:** skanerlansa `t.me/<bot>?start=t<talon>` — bot talon holatini ko'rsatadi va raqam ulashni so'raydi; bot nomi tick orqali avtomatik aniqlanadi (Sozlamalar → Telegram → "Bot nomi")
 - **Chekdan keyin qog'oz surish** (Sozlamalar → Printerlar, odatiy 15 mm) + "✂" kesish chizig'i — chek yirtish tishigacha o'zi chiqadi; avtomatik kesish XP-80 drayverida (Настройки печати → Paper Cut), yo'riqnoma dasturda
+
+### 2026-11-12 — Qarzga olingan tovarlar bo'limlari
+- Qarzlar sahifasi kimdan olingani bo'yicha kartalarga bo'lingan (masalan "Muhammadyusuf Alo servis"); bosilganda o'sha kishidan qachon nima olingani chiqadi
+- Summa ixtiyoriy (keyin "+ Summa" bilan qo'shiladi; bor summani faqat rahbar o'zgartiradi); xodimlar ham barcha qarzlarni ko'radi va yozadi
+- Servis mijozi uchun olingan tovar talonga bog'lanadi; mijoz qurilmasini olib ketganda (talon "berildi") "✅ Topshirildi" o'zi qo'yiladi, qo'lda ham belgilanadi
+- "💵 Qarzni berish": tovarlarni belgilab bitta to'lov (summa ixtiyoriy); "🕘 Tarix" — berilgan qarzlar ro'yxati; rahbar to'lovni bekor qila oladi
+- Rangli qatorlar: sariq — qarzda, ko'k — topshirilgan, yashil — qarzi berilgan, qizil — muddati o'tgan
 
 ## Kelishuvlar
 - Javoblar o'zbek tilida
