@@ -61,6 +61,8 @@
 - "💵 Qarzni berish": tovarlarni belgilab bitta to'lov (summa ixtiyoriy); "🕘 Tarix" — berilgan qarzlar ro'yxati; rahbar to'lovni bekor qila oladi
 - Rangli qatorlar: sariq — qarzda, ko'k — topshirilgan, yashil — qarzi berilgan, qizil — muddati o'tgan
 
+> ⏳ **Joylash kutilmoqda (2026-11-12):** qarz bo'limlari kodi tayyor (`manba/app/src/main.js`), lekin sayt hali oldingi versiyada. Kompyuterdagi Claude ilovasi ochiq bo'lganda tartib: 1) Supabase SQL editor'da `manba/supabase/migrations/0022_qarz_bolim.sql` ni ishga tushirish; 2) `tick` funksiyasini `manba/deploy/tick.ts` bilan yangilash; 3) `manba/app` dan `npx vite build` qilib, `dist/*` ni repo ildiziga joylash va push.
+
 ## Kelishuvlar
 - Javoblar o'zbek tilida
 - Foydani faqat rahbar ko'radi
