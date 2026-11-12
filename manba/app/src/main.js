@@ -65,8 +65,9 @@ const both=(uzs,usdv)=>`${fmt(uzs)} so'm <span class="muted">· ${usd(usdv==null
 const canStock=()=>owner()||(S.mods.stockin!==false&&me().canStock);
 const canDebt=()=>S.mods.debts!==false&&(owner()||me().canDebt);
 const monthOf=ts=>dayOf(ts).slice(0,7);
-function payroll(u){const p=S.payroll[u.id]||{};return {base:+p.base||0,bonus:+p.bonus||0,kpiSum:+p.kpi_sum||0,total:+p.total||0,paid:+p.paid||0,left:+p.left_to_pay||0};}
-const kpiLabel=u=>{const sv=u.kpiBase==='tushum'?'savdo tushumi':'savdo foydasi'; return u.role==='usta'?'topshirilgan remontlar summasidan':u.role==='usta_sotuvchi'?`remontlar summasi + ${sv}dan`:`${sv}dan`;};
+function payroll(u){const p=S.payroll[u.id]||{};return {base:+p.base||0,bonus:+p.bonus||0,fixed:+p.fixed||0,kpiSum:+p.kpi_sum||0,total:+p.total||0,paid:+p.paid||0,left:+p.left_to_pay||0};}
+const fxLabel=u=>Object.entries(u.fixedKpi||{}).filter(([,a])=>+a>0).map(([k,a])=>`${lineNm(k)}: ${fmt(+a)} so'm/dona`).join(', ');
+const kpiLabel=u=>{const sv=u.kpiBase==='tushum'?'savdo tushumi':'savdo foydasi'; return (fxLabel(u)?fxLabel(u)+' · qolgani: ':'')+(u.role==='usta'?'topshirilgan remontlar summasidan':u.role==='usta_sotuvchi'?`remontlar summasi + ${sv}dan`:`${sv}dan`);};
 const C128=('212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 '+
 '221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 '+
 '231113 231311 112133 112331 132131 113123 113321 133121 313121 211331 231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 '+
@@ -795,7 +796,7 @@ function vXodimlar(){
   ${S.mods.salary?`<section class="panel"><h2>Oylik hisobi · ${today().slice(0,7)}</h2>
   <div class="tbl"><table><thead><tr><th>Xodim</th><th class="r">Oklad</th><th class="r">KPI</th><th class="r">Hisoblangan</th><th class="r">Berilgan</th><th class="r">Qoldiq</th><th></th></tr></thead><tbody>
   ${S.users.filter(u=>u.role!=='owner'&&u.active).map(u=>{const p=payroll(u);
-    return `<tr><td>${esc(u.name)}<div class="small muted">${u.kpi}% ${kpiLabel(u)}</div></td><td class="r num">${fmt(u.oklad)}</td><td class="r num">${fmt(p.kpiSum)}${p.bonus?`<div class="small muted">shundan qo'lda: ${p.bonus<0?'−':''}${fmt(Math.abs(p.bonus))}</div>`:''}</td>
+    return `<tr><td>${esc(u.name)}<div class="small muted">${u.kpi}% ${kpiLabel(u)}</div></td><td class="r num">${fmt(u.oklad)}</td><td class="r num">${fmt(p.kpiSum)}${p.bonus?`<div class="small muted">shundan qo'lda: ${p.bonus<0?'−':''}${fmt(Math.abs(p.bonus))}</div>`:''}${p.fixed?`<div class="small muted">qat'iy (noutbuk va h.k.): ${fmt(p.fixed)}</div>`:''}</td>
     <td class="r num">${fmt(p.total)}</td><td class="r num">${fmt(p.paid)}</td><td class="r num"><b>${fmt(p.left)}</b></td>
     <td><div class="row" style="flex-wrap:nowrap"><button class="sm pri" data-salpay="${u.id}">Oylik berish</button><button class="sm" data-kpiadd="${u.id}" title="Qo'lda KPI qo'shish (masalan noutbuk sotgani uchun)">+ KPI</button><button class="sm" data-salchek="${u.id}" title="Oylik cheki: oklad, KPI sabablari, berilgan">🧾 Chek</button><button class="sm" data-pay="${u.id}">Sozlash</button></div></td></tr>`}).join('')}
   </tbody></table></div><p class="small muted">Berilgan oylik avtomatik "Oylik / avans" rasxodi bo'lib yoziladi va sizga bildirishnoma keladi. Oylik berilgach chek o'zi chiqadi.</p></section>
@@ -1152,16 +1153,17 @@ async function salChekModal(uid,mon){
   const n=x=>fmt(Math.round(+x||0)), ln=(a,b,st='')=>`<div class="kv" ${st?`style="${st}"`:''}><span>${a}</span><span>${b}</span></div>`;
   const reps=d.repairs||[], sales=d.sales||[], rets=d.returns||[], bon=d.bonuses||[], pays=d.payments||[];
   const kp=+d.kpi||0, base=+d.base||0, kpiCalc=Math.round(base*kp/100);
-  const repSum=reps.reduce((a,r)=>a+(+r.amount||0),0), salT=sales.reduce((a,x)=>a+x.qty*x.price,0), salP=sales.reduce((a,x)=>a+(+x.profit||0),0);
+  const repSum=reps.reduce((a,r)=>a+(+r.amount||0),0), pct=sales.filter(x=>!(+x.fx>0)), fxs=sales.filter(x=>+x.fx>0), salT=pct.reduce((a,x)=>a+x.qty*x.price,0), salP=pct.reduce((a,x)=>a+(+x.profit||0),0);
   const tush=d.kpi_base==='tushum';
   modal(`<h3>Oylik cheki · ${esc(d.name)}</h3><div class="ticket" ${tkAttr()}>
   <div class="hd"><b>${esc(S.company.name)}</b><br>OYLIK HISOBI</div><hr>
   ${ln('Xodim:','<b>'+esc(d.name)+'</b>')}${ln('Lavozim:',esc(ROLE_NM[d.role]||d.role))}${ln('Oy:',esc(mon))}${ln('Chek sanasi:',dts(Date.now()))}<hr>
   ${ln('Oklad:',n(d.oklad))}
   ${reps.length?`<hr><div><b>Servis ishlari (${reps.length} ta)</b></div>${reps.map(r=>ln(`№${tn(r.talon)} ${esc(r.device||'')}${r.shared?` <span class="small">(ulushi, jami ${n(r.fee)})</span>`:''}`,n(r.amount))).join('')}${ln('Servis jami:','<b>'+n(repSum)+'</b>')}`:''}
-  ${sales.length?`<hr><div><b>Sotuvlar (${sales.length} qator)</b></div>${sales.map(x=>ln(`№${x.no} ${esc(x.name)} ×${x.qty}`,n(x.qty*x.price)+(tush?'':` <span class="small">(f ${n(x.profit)})</span>`))).join('')}
+  ${fxs.length?`<hr><div><b>Qat'iy KPI li sotuvlar</b></div>${fxs.map(x=>ln(`№${x.no} ${esc(x.name.split('|')[0])} ×${x.qty}`,`${n(x.fx)}×${x.qty} = ${n(x.fx*x.qty)}`)).join('')}${rets.filter(x=>+x.fx>0).map(x=>ln(`Vazvrat: ${esc(x.name.split('|')[0])} ×${x.qty}`,'−'+n(x.fx*x.qty))).join('')}${ln("Qat'iy KPI jami:",'<b>'+n(d.fixed)+'</b>')}`:''}
+  ${pct.length?`<hr><div><b>Sotuvlar (${pct.length} qator)</b></div>${pct.map(x=>ln(`№${x.no} ${esc(x.name)} ×${x.qty}`,n(x.qty*x.price)+(tush?'':` <span class="small">(f ${n(x.profit)})</span>`))).join('')}
     ${ln('Sotuv tushumi:',n(salT))}${tush?'':ln('Sotuv foydasi:',n(salP))}`:''}
-  ${rets.length?`${rets.map(x=>ln(`Vazvrat: ${esc(x.name)} ×${x.qty}`,'−'+n(tush?x.refund:x.profit))).join('')}`:''}
+  ${rets.filter(x=>!(+x.fx>0)).length?`${rets.filter(x=>!(+x.fx>0)).map(x=>ln(`Vazvrat: ${esc(x.name)} ×${x.qty}`,'−'+n(tush?x.refund:x.profit))).join('')}`:''}
   ${kp?`<hr>${ln(`KPI ${kp}% × ${n(base)}:`,'<b>'+n(kpiCalc)+'</b>')}`:''}
   ${bon.length?`<hr><div><b>Qo'shimcha KPI</b></div>${bon.map(b=>ln(esc(b.reason||'KPI')+` <span class="small">${dS(ms(b.ts))}</span>`,(b.amount<0?'−':'+')+n(Math.abs(b.amount)))).join('')}${ln("Qo'shimcha jami:",'<b>'+n(d.bonus)+'</b>')}`:''}
   <hr>${ln('KPI jami:',n(d.kpi_sum))}
@@ -1355,6 +1357,8 @@ function payModal(id){
   <label>Oklad (so'm/oy)<input id="p_oklad" type="number" min="0" step="any" value="${u.oklad}" class="num"></label>
   <label>KPI foizi (%)<input id="p_kpi" type="number" min="0" max="100" step="any" value="${u.kpi}" class="num"></label>
   ${isSeller(u)?`<label>KPI qaysi summadan<select id="p_base"><option value="foyda" ${u.kpiBase==='foyda'?'selected':''}>Savdo foydasidan</option><option value="tushum" ${u.kpiBase==='tushum'?'selected':''}>Savdo tushumidan</option></select></label>`:'<p class="small muted" style="margin:0">Usta KPI: o\'zi topshirgan remontlar summasidan</p>'}
+  <div style="display:grid;gap:6px"><div class="small muted">QAT'IY KPI — har bir sotilgan dona uchun (bu bo'lim sotuvlari foizli KPI ga kirmaydi; 0 — o'chiq)</div>
+  ${lineKeys().filter(k=>k!=='servis').map(k=>`<label>${esc(lineNm(k))}: so'm / dona<input data-fxk="${k}" type="number" min="0" step="any" value="${+(u.fixedKpi||{})[k]||''}" placeholder="0" class="num"></label>`).join('')}</div>
   <label>Hozir to'lash (avans/oylik, so'm)<input id="p_pay" type="number" min="0" step="any" placeholder="Qoldiq: ${fmt(p.left)}" class="num"></label>
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div></form>`);
 }
@@ -1674,7 +1678,7 @@ async function refresh() {
     users: profs.map((p) => ({
       id: p.id, name: p.name, login: p.login, role: p.role, active: p.active,
       canExpense: p.can_expense, seeSalary: p.see_salary, canDebt: p.can_debt, canReturn: p.can_return, canCredit: p.can_credit, canStock: p.can_stock, canDiscount: p.can_discount,
-      oklad: +(payMap[p.id]?.oklad || 0), kpi: +(payMap[p.id]?.kpi || 0), kpiBase: payMap[p.id]?.kpi_base || 'foyda',
+      oklad: +(payMap[p.id]?.oklad || 0), kpi: +(payMap[p.id]?.kpi || 0), kpiBase: payMap[p.id]?.kpi_base || 'foyda', fixedKpi: payMap[p.id]?.fixed_kpi || {},
     })),
     products: prods.map((p) => ({ id: p.id, name: p.name, barcode: p.barcode, line: p.line, qty: p.qty, sellUsd: +p.sell_usd, sellUzs: p.sell_uzs == null ? null : +p.sell_uzs, lastIn: ms(p.last_in || p.created_at), costUsd: costMap[p.id] ?? 0,
       warranty: p.warranty && typeof p.warranty === 'object' ? p.warranty : null, photo: p.photo || '', photos: Array.isArray(p.photos) && p.photos.length ? p.photos.filter(Boolean) : (p.photo ? [p.photo] : []), minQty: p.min_qty == null ? null : +p.min_qty })),
@@ -1929,7 +1933,8 @@ document.addEventListener('submit', async (e) => {
     if (id === 'payF') {
       const uidv = e.target.dataset.u, pay = +v('p_pay') || 0;
       await act(async () => {
-        await must(db.from('staff_pay').upsert({ user_id: uidv, oklad: +v('p_oklad') || 0, kpi: +v('p_kpi') || 0, kpi_base: v('p_base') || 'foyda' }));
+        const fixed_kpi = Object.fromEntries([...document.querySelectorAll('[data-fxk]')].map((x) => [x.dataset.fxk, Math.round(+x.value || 0)]).filter(([, a]) => a > 0));
+        await must(db.from('staff_pay').upsert({ user_id: uidv, oklad: +v('p_oklad') || 0, kpi: +v('p_kpi') || 0, kpi_base: v('p_base') || 'foyda', fixed_kpi }));
         if (pay > 0) await must(db.from('expenses').insert({ user_id: S.cur, cat: 'oylik', amount_uzs: pay, to_user: uidv, note: 'Oylik' }));
       }, pay > 0 ? `${fmt(pay)} so'm to'landi` : 'Saqlandi');
       closeModal();
