@@ -19,7 +19,7 @@
 
 ## Tuzilishi
 - Ilova: Vite + oddiy JavaScript (`manba/app/src/main.js`), PWA — Android, iOS, kompyuterda ishlaydi
-- Baza o'zgarishlari: `manba/supabase/migrations/0001 … 0022` (0021 — ustaxona nazorati, 0022 — qarz bo'limlari)
+- Baza o'zgarishlari: `manba/supabase/migrations/0001 … 0023` (0021 — ustaxona nazorati, 0022 — qarz bo'limlari, 0023 — KPI/zapchast/rasmlar)
 - Server funksiyalari (Supabase Edge): `tick` (har 5 daqiqada), `tg-bot` (Telegram bot), `admin-users`
   - Dashboard uchun bitta faylli nusxalar: `manba/deploy/tick.ts`, `manba/deploy/tg-bot.ts`
   - "Verify JWT" o'chiq turishi shart
@@ -63,6 +63,15 @@
 - **Ombor bo'limlarga ajratilgan:** tepada bo'lim kartalari (Hammasi / Noutbuklar / Kompyuter / qo'lda yaratilganlar — xil, dona, kam qolgan, qiymat); har bo'lim alohida jadvalda; kartani bossangiz faqat o'sha bo'lim, kirim formasida bo'lim o'zi tanlanadi
 
 > ✅ **Joylandi (2026-11-12):** 0022 bazaga qo'yildi, `tick` yangilandi, sayt yangi versiyada.
+
+### 2026-11-12 (2) — KPI, zapchast, rasmlar
+- **Qo'lda KPI:** Xodimlar → Oylik hisobi → "+ KPI" (summa, sababi, oy; jarima — minus); sotuvlar ro'yxatida har sotuvga "+ KPI". Jadval `kpi_bonus`, oylikka qo'shiladi
+- **Oylik cheki** (`payroll_detail`): oklad, servis talonlari, sotuvlar, KPI %, qo'lda KPI sabablari, berilganlar, qoldiq; oylik berilganda o'zi chiqadi, "🧾 Chek" tugmasi
+- **Tahrirlash:** rasxodlar va oylik berish tarixi ✎ (faqat rahbar)
+- **Talonga zapchast:** Ustaxona → "🧩 Zapchast" — ombordan sotuv talonga bog'lanadi (`sales.repair_talon`), talonda Jami = servis + zapchast
+- **Ishni bo'lish:** "👥 Ish" — servis summasini ustalarga (`repair_workers`); KPI har kimga o'z summasidan, qolgani hech kimga
+- **Yopishtirgich:** talon raqami katta
+- **Rasmlar:** tovarga 10 tagacha (`products.photos`), Telegram kanalga albom; "📷 Instagram'ga post" — telefonda ulashish, matn nusxalanadi
 
 ## Kelishuvlar
 - Javoblar o'zbek tilida
