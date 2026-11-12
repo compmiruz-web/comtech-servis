@@ -402,15 +402,20 @@ function addToCart(p){
 }
 
 /* ---------- OMBOR ---------- */
+let oLine='';
 function vOmbor(){
   const q=oSearch.toLowerCase();
   const list=S.products.filter(p=>(!oLow||isLow(p))&&(!q||p.name.toLowerCase().includes(q)||p.barcode.includes(q))).sort((a,b)=>(timeOrder==='desc'?(b.lastIn||0)-(a.lastIn||0):(a.lastIn||0)-(b.lastIn||0)));
   const stockVal=S.products.reduce((a,p)=>a+p.costUsd*p.qty,0);
+  const keys=[...new Set([...lineKeys(),...S.products.map(p=>p.line||'kompyuter')])];
+  const secs=keys.map(k=>{const P=S.products.filter(p=>(p.line||'kompyuter')===k); return {k,t:lineNm(k),n:P.length,q:P.reduce((a,p)=>a+p.qty,0),low:P.filter(isLow).length,val:P.reduce((a,p)=>a+p.costUsd*p.qty,0)};}).filter(x=>x.n||x.k!=='servis');
+  if(oLine&&!secs.some(x=>x.k===oLine)) oLine='';
+  const shown=secs.filter(x=>(!oLine||x.k===oLine)&&(oLine||list.some(p=>(p.line||'kompyuter')===x.k)));
   return `${canStock()?`<section class="panel"><h2>Kirim qilish</h2>
     <form id="kirimF" class="form">
       <label>Shtrix-kod<span class="row" style="flex-wrap:nowrap"><input id="k_bar" required inputmode="numeric" placeholder="Skanerlang"><button type="button" class="sm" data-cam="k_bar" title="Kamera bilan skanerlash">📷</button><button type="button" class="sm" id="genBar" title="Shtrix-kodi yo'q tovar uchun">Yaratish</button></span></label>
       <label class="full">Nomi<input id="k_name" required placeholder="Masalan: SSD Samsung 870 EVO 500GB"></label>
-      <label>Bo'lim (etiketka uchun)<span class="row" style="flex-wrap:nowrap"><select id="k_line" style="flex:1">${lineOptions('kompyuter')}</select>${lineAddBtn('k_line')}</span></label>
+      <label>Bo'lim (etiketka uchun)<span class="row" style="flex-wrap:nowrap"><select id="k_line" style="flex:1">${lineOptions(oLine||'kompyuter')}</select>${lineAddBtn('k_line')}</span></label>
       <label>Soni<input id="k_qty" type="number" min="1" value="1" required></label>
       <label>Narx valyutasi<select id="k_cur"><option value="usd" ${kCur==='usd'?'selected':''}>Dollarda ($)</option><option value="uzs" ${kCur==='uzs'?'selected':''}>So'mda</option></select></label>
       <label><span id="k_costL">Kelish narxi (${kSym()})</span><input id="k_cost" type="number" step="any" min="0" ${owner()?'required':'placeholder="Mavjud tovarda bo\'sh qoldiring"'}></label>
@@ -420,15 +425,23 @@ function vOmbor(){
   <section class="panel">
     <div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Tovarlar qoldig'i</h2>
     ${owner()?`<span class="chip">Ombor qiymati: <span class="num">${usd(stockVal)}</span></span>`:''}</div>
-    <div class="row" style="flex-wrap:nowrap;gap:6px;margin-bottom:10px"><input id="oSearch" placeholder="Qidirish: nomi yoki shtrix-kod" value="${esc(oSearch)}" style="flex:1;min-width:0">${(()=>{const n=S.products.filter(isLow).length;return n||oLow?`<button type="button" class="sm ${oLow?'pri':''}" data-olow="1" title="Buyurtma qilish kerak bo'lgan tovarlar">⚠ Kam qolgan (${n})</button>`:'';})()}</div>
+    <div class="row" style="flex-wrap:nowrap;gap:6px;margin-bottom:12px"><input id="oSearch" placeholder="Qidirish: nomi yoki shtrix-kod" value="${esc(oSearch)}" style="flex:1;min-width:0">${(()=>{const n=S.products.filter(isLow).length;return n||oLow?`<button type="button" class="sm ${oLow?'pri':''}" data-olow="1" title="Buyurtma qilish kerak bo'lgan tovarlar">⚠ Kam qolgan (${n})</button>`:'';})()}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">
+      ${[{k:'',t:'Hammasi',n:S.products.length,q:S.products.reduce((a,p)=>a+p.qty,0),low:S.products.filter(isLow).length,val:stockVal},...secs].map(x=>`<button type="button" data-oline="${esc(x.k)}" style="text-align:left;display:block;height:auto;white-space:normal;padding:10px 12px;border-radius:12px;border:${oLine===x.k?'2px solid var(--accent)':'1px solid var(--line)'};background:${oLine===x.k?'var(--accent-soft)':'var(--panel)'}">
+        <div style="font-weight:700">${x.k?'📦 ':''}${esc(x.t)}</div>
+        <div class="small muted" style="margin-top:4px">${x.n} xil · <span class="num">${x.q}</span> dona${x.low?` · <span style="color:var(--warn)">⚠ ${x.low}</span>`:''}</div>
+        ${owner()?`<div class="small num" style="margin-top:2px">${usd(x.val)}</div>`:''}</button>`).join('')}
+    </div>
+  </section>
+  ${shown.map(x=>{const L=list.filter(p=>(p.line||'kompyuter')===x.k);
+    return `<section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:8px;gap:8px"><h2 style="margin:0">📦 ${esc(x.t)}</h2><span class="small muted">${L.length} xil · <span class="num">${L.reduce((a,p)=>a+p.qty,0)}</span> dona${owner()?` · <span class="num">${usd(L.reduce((a,p)=>a+p.costUsd*p.qty,0))}</span>`:''}</span></div>
     <div class="tbl"><table><thead><tr><th>Kirim vaqti</th><th>Nomi</th><th>Shtrix-kod</th><th class="r">Soni</th>${owner()?'<th class="r">Kelish $</th><th class="r">Sotish $</th>':''}<th class="r">Narxi (so'm)</th><th></th></tr></thead><tbody>
-    ${list.map(p=>`<tr data-ts="${p.lastIn||0}"><td class="num small" style="white-space:nowrap">${dS(p.lastIn)}<br><span class="muted">${tS(p.lastIn)}</span></td><td>${p.photo?'<span title="Rasmi bor">🖼 </span>':''}${esc(p.name)}<div><span class="chip" style="font-size:11px;padding:1px 8px;margin-top:3px">${esc(lineTitle(p.line||'kompyuter'))}</span>${p.warranty&&+p.warranty.n?`<span class="chip" style="font-size:11px;padding:1px 8px;margin:3px 0 0 4px">🛡 ${esc(warText(p.warranty.n,p.warranty.u))}</span>`:''}</div></td><td class="num small">${esc(p.barcode)}</td>
+    ${L.map(p=>`<tr data-ts="${p.lastIn||0}"><td class="num small" style="white-space:nowrap">${dS(p.lastIn)}<br><span class="muted">${tS(p.lastIn)}</span></td><td>${p.photo?'<span title="Rasmi bor">🖼 </span>':''}${esc(p.name)}<div>${p.warranty&&+p.warranty.n?`<span class="chip" style="font-size:11px;padding:1px 8px;margin:3px 0 0 0">🛡 ${esc(warText(p.warranty.n,p.warranty.u))}</span>`:''}</div></td><td class="num small">${esc(p.barcode)}</td>
     <td class="r">${isLow(p)||p.qty===0?`<span class="chip ${p.qty?'warn':'bad'} num" title="${isLow(p)?'Kam qoldi — buyurtma qilish kerak':''}">${p.qty}</span>`:`<span class="num">${p.qty}</span>`}</td>
     ${owner()?`<td class="r num">${usd(p.costUsd)}</td><td class="r num">${p.sellUzs?`<span title="So'mda qat'iy narx — kurs o'zgarsa ham o'zgarmaydi">${fmt(p.sellUzs)} so'm</span>`:usd(p.sellUsd)}</td>`:''}
     <td class="r num">${fmt(priceUzs(p))}<div class="small muted">${usd(usdP(p))}</div></td><td><div class="row" style="flex-wrap:nowrap">${owner()?`<button class="sm" data-pedit="${p.id}" title="Barcha parametrlarni o'zgartirish">✎</button>`:''}${canStock()?`<button class="sm" data-pextra="${p.id}" title="Rasm, kafolat, kam qoldiq chegarasi, kanalga joylash">📷</button>`:''}<button class="sm" data-label="${p.id}">Etiketka</button><button class="sm" data-stk="p${p.id}">Yopishtirgich</button></div></td></tr>`).join('')}
-    </tbody></table></div>
-    ${owner()?'':`<div class="lock" style="margin-top:12px">${canStock()?'Kelish narxlari faqat rahbarga ko\'rinadi.':'Kelish narxi va kirim faqat rahbar rejimida ko\'rinadi.'}</div>`}
-  </section>
+    </tbody></table></div></section>`;}).join('')||`<section class="panel"><p class="muted" style="margin:0">${q||oLow?'Hech narsa topilmadi':'Bu bo\'limda tovar yo\'q'}</p></section>`}
+  ${owner()?'':`<section class="panel"><div class="lock" style="margin:0">${canStock()?'Kelish narxlari faqat rahbarga ko\'rinadi.':'Kelish narxi va kirim faqat rahbar rejimida ko\'rinadi.'}</div></section>`}
   ${owner()?movesPanel():''}`;
 }
 const MV_N={kirim:'Kirim',sotuv:'Sotuv (chiqim)',tuzatish:'Tuzatish'};
@@ -2060,6 +2073,7 @@ document.addEventListener('click', async (e) => {
     if (b.dataset.pedit) productEditModal(b.dataset.pedit);
     if (b.dataset.pextra) pExtraModal(b.dataset.pextra);
     if (b.dataset.olow) { oLow = !oLow; keepScroll(render); }
+    if (b.dataset.oline !== undefined) { oLine = b.dataset.oline; keepScroll(render); }
     if (b.dataset.anp) { anPeriod = b.dataset.anp; keepScroll(render); }
     if (b.dataset.chpost) { const id = b.dataset.chpost; await act(() => db.rpc('channel_post_now', { p_product: id }).then(must0), 'Navbatga qo\'yildi — 5 daqiqa ichida kanalga joylanadi'); pExtraModal(id); }
     if (b.dataset.copy) { const el = document.getElementById(b.dataset.copy); try { await navigator.clipboard.writeText(el.value); toast('Nusxalandi'); } catch { el.select(); document.execCommand('copy'); toast('Nusxalandi'); } }
