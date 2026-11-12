@@ -224,6 +224,14 @@ td.talonno{border-left:3px solid var(--accent)}
 .stk .qr svg{width:100%;height:100%;display:block}
 .stk .sf{grid-column:1/-1;display:flex;justify-content:space-between;gap:4px;border-top:1px dashed #000;padding-top:.8mm;font-family:var(--mono);font-weight:700;font-size:.9em;white-space:nowrap;align-self:end}
 .stk.noqr{grid-template-columns:minmax(0,1fr)}
+.stk .sf.hasref{align-items:flex-end;white-space:normal}
+.stk .sf .sft{min-width:0;overflow:hidden;line-height:1.1;font-size:.85em}
+.stk .sf .sref{font-family:var(--mono);font-weight:900;font-size:2.3em;line-height:.95;white-space:nowrap;letter-spacing:-.02em}
+.phgal{display:flex;gap:8px;flex-wrap:wrap}
+.phgal .ph{width:92px;height:92px;border-radius:10px;border:1px solid var(--line);background:center/cover no-repeat;position:relative}
+.phgal .ph.main{outline:3px solid var(--accent,#2bb673)}
+.phgal .ph button{position:absolute;padding:0 6px;min-height:0;height:24px;font-size:13px;line-height:22px}
+.phgal .ph .phx{top:3px;right:3px}.phgal .ph .phm{bottom:3px;left:3px}
 .stk .sn{grid-column:1/-1;font-family:var(--sans);font-weight:700;line-height:1.1;overflow-wrap:anywhere;border-top:1px solid #000;padding-top:.6mm}
 .labels-sheet{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:14px;background:var(--sunk);border-radius:10px;max-height:46vh;overflow:auto}
 @media (max-width:980px){.grid2{grid-template-columns:minmax(0,1fr)}}

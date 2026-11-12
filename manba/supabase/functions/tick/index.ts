@@ -327,8 +327,11 @@ async function channelPosts(db: Db, s: any) {
         `💰 Narxi: ${fmt(price)} so'm`, ...(w ? [`🛡 Kafolat: ${w}`] : []), ...(p.qty > 1 ? [`📦 Mavjud: ${p.qty} dona`] : []), '',
         ...(ln.phone ? [`📞 ${ln.phone}`] : []), [ln.telegram && `✈️ ${ln.telegram}`, ln.instagram && `📷 ${ln.instagram}`].filter(Boolean).join(' · '),
       ].filter((x, i, a) => !(x === '' && a[i - 1] === '')).join('\n').trim();
-      const msg = p.photo
-        ? await tg('sendPhoto', { chat_id: chat, photo: p.photo, caption: caption.slice(0, 1024) })
+      const pics: string[] = (Array.isArray(p.photos) && p.photos.length ? p.photos : (p.photo ? [p.photo] : [])).filter(Boolean).slice(0, 10);
+      const msg = pics.length > 1
+        ? (await tg('sendMediaGroup', { chat_id: chat, media: pics.map((u, i) => ({ type: 'photo', media: u, ...(i === 0 ? { caption: caption.slice(0, 1024) } : {}) })) }))?.[0]
+        : pics.length
+        ? await tg('sendPhoto', { chat_id: chat, photo: pics[0], caption: caption.slice(0, 1024) })
         : await tg('sendMessage', { chat_id: chat, text: caption.slice(0, 4000) });
       await db.from('channel_posts').update({ posted_at: new Date().toISOString(), message_id: msg?.message_id || null }).eq('id', it.id);
       n++;

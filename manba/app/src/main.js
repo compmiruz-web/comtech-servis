@@ -65,7 +65,7 @@ const both=(uzs,usdv)=>`${fmt(uzs)} so'm <span class="muted">· ${usd(usdv==null
 const canStock=()=>owner()||(S.mods.stockin!==false&&me().canStock);
 const canDebt=()=>S.mods.debts!==false&&(owner()||me().canDebt);
 const monthOf=ts=>dayOf(ts).slice(0,7);
-function payroll(u){const p=S.payroll[u.id]||{};return {base:+p.base||0,kpiSum:+p.kpi_sum||0,total:+p.total||0,paid:+p.paid||0,left:+p.left_to_pay||0};}
+function payroll(u){const p=S.payroll[u.id]||{};return {base:+p.base||0,bonus:+p.bonus||0,kpiSum:+p.kpi_sum||0,total:+p.total||0,paid:+p.paid||0,left:+p.left_to_pay||0};}
 const kpiLabel=u=>{const sv=u.kpiBase==='tushum'?'savdo tushumi':'savdo foydasi'; return u.role==='usta'?'topshirilgan remontlar summasidan':u.role==='usta_sotuvchi'?`remontlar summasi + ${sv}dan`:`${sv}dan`;};
 const C128=('212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 '+
 '221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 '+
@@ -179,7 +179,7 @@ function stickerHtml(o){const c=lineOf(o.line); const q=o.qr&&c.telegram?qrSvg(t
   <div class="sp">${esc(c.phone)}</div><div class="so">${c.telegram?'TG '+esc(c.telegram):''}<br>${c.instagram?'IG '+esc(c.instagram):''}</div></div>
   ${q?`<div class="qr">${q}</div>`:''}
   ${o.name?`<div class="sn">${esc(o.name).replace(/\|/g,'|<wbr>')}</div>`:''}
-  <div class="sf"><span>${till?'Kafolat: '+till+' gacha':'Servis uchun murojaat qiling'}</span><span>${o.ref?esc(o.ref):''}</span></div></div>`;}
+  <div class="sf ${o.ref?'hasref':''}"><span class="sft">${till?'Kafolat: '+till+' gacha':'Servis uchun murojaat qiling'}</span>${o.ref?`<span class="sref">${esc(o.ref)}</span>`:''}</div></div>`;}
 let stkCtx={};
 function stickerModal(ctx){stkCtx=ctx;
   modal(`<h3>Yopishtirgich${ctx.ref?' · '+esc(ctx.ref):''}</h3>
@@ -387,9 +387,9 @@ function salesTable(list){
   return `<div class="tbl"><table><thead><tr><th>№ / vaqt</th><th>Tovarlar</th><th>Sotuvchi</th><th>To'lov</th><th class="r">Summa</th>${owner()?'<th class="r">Foyda</th>':''}<th></th></tr></thead><tbody>
   ${list.slice().reverse().map(s=>{const late=s.enteredTs&&dayOf(s.enteredTs)!==dayOf(s.ts);
     return `<tr data-ts="${s.ts||0}"><td class="num">${s.no?'№'+s.no:''}<div class="small muted num">${late?`${dS(s.ts)} · kiritildi ${dts(s.enteredTs)}`:tS(s.ts)}</div></td>
-  <td>${s.items.map(i=>{const b=returnedQty(i.id);return esc(i.name)+' ×'+i.qty+(b?` <span class="chip bad" style="font-size:11px;padding:1px 7px">${b} qaytgan</span>`:'');}).join('<br>')}</td><td>${esc(uName(s.userId))}</td><td>${esc(s.pay)}</td><td class="r num">${fmt(s.totalUzs)}</td>
+  <td>${s.talon?`<div class="small muted">🧩 Talon №${tn(s.talon)} uchun</div>`:''}${s.items.map(i=>{const b=returnedQty(i.id);return esc(i.name)+' ×'+i.qty+(b?` <span class="chip bad" style="font-size:11px;padding:1px 7px">${b} qaytgan</span>`:'');}).join('<br>')}</td><td>${esc(uName(s.userId))}</td><td>${esc(s.pay)}</td><td class="r num">${fmt(s.totalUzs)}</td>
   ${owner()?`<td class="r num">${fmt(saleProfit(s))}</td>`:''}
-  <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-receipt="${s.id}">Chek</button>${canReturn()?`<button class="sm" data-return="${s.id}">Vazvrat</button>`:''}${owner()?`<button class="sm" data-sedit="${s.id}" title="Narx, soni, to'lov turi, vaqtini o'zgartirish">✎</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`;
+  <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-receipt="${s.id}">Chek</button>${canReturn()?`<button class="sm" data-return="${s.id}">Vazvrat</button>`:''}${owner()?`<button class="sm" data-sedit="${s.id}" title="Narx, soni, to'lov turi, vaqtini o'zgartirish">✎</button>${S.mods.salary?`<button class="sm" data-kpisale="${s.id}" title="Shu sotuv uchun sotuvchiga qo'lda KPI">${(S.kbon||[]).some(k=>k.saleId===s.id)?'✅ KPI':'+ KPI'}</button>`:''}`:''}</div></td></tr>`}).join('')}</tbody></table></div>`;
 }
 const saleCost=s=>s.items.reduce((a,i)=>a+i.costUsd*i.rate*i.qty,0);
 const saleProfit=s=>s.totalUzs-saleCost(s);
@@ -439,7 +439,7 @@ function vOmbor(){
     ${L.map(p=>`<tr data-ts="${p.lastIn||0}"><td class="num small" style="white-space:nowrap">${dS(p.lastIn)}<br><span class="muted">${tS(p.lastIn)}</span></td><td>${p.photo?'<span title="Rasmi bor">🖼 </span>':''}${esc(p.name)}<div>${p.warranty&&+p.warranty.n?`<span class="chip" style="font-size:11px;padding:1px 8px;margin:3px 0 0 0">🛡 ${esc(warText(p.warranty.n,p.warranty.u))}</span>`:''}</div></td><td class="num small">${esc(p.barcode)}</td>
     <td class="r">${isLow(p)||p.qty===0?`<span class="chip ${p.qty?'warn':'bad'} num" title="${isLow(p)?'Kam qoldi — buyurtma qilish kerak':''}">${p.qty}</span>`:`<span class="num">${p.qty}</span>`}</td>
     ${owner()?`<td class="r num">${usd(p.costUsd)}</td><td class="r num">${p.sellUzs?`<span title="So'mda qat'iy narx — kurs o'zgarsa ham o'zgarmaydi">${fmt(p.sellUzs)} so'm</span>`:usd(p.sellUsd)}</td>`:''}
-    <td class="r num">${fmt(priceUzs(p))}<div class="small muted">${usd(usdP(p))}</div></td><td><div class="row" style="flex-wrap:nowrap">${owner()?`<button class="sm" data-pedit="${p.id}" title="Barcha parametrlarni o'zgartirish">✎</button>`:''}${canStock()?`<button class="sm" data-pextra="${p.id}" title="Rasm, kafolat, kam qoldiq chegarasi, kanalga joylash">📷</button>`:''}<button class="sm" data-label="${p.id}">Etiketka</button><button class="sm" data-stk="p${p.id}">Yopishtirgich</button></div></td></tr>`).join('')}
+    <td class="r num">${fmt(priceUzs(p))}<div class="small muted">${usd(usdP(p))}</div></td><td><div class="row" style="flex-wrap:nowrap">${owner()?`<button class="sm" data-pedit="${p.id}" title="Barcha parametrlarni o'zgartirish">✎</button>`:''}${canStock()?`<button class="sm" data-pextra="${p.id}" title="Rasmlar, Telegram/Instagram post, kafolat, kam qoldiq chegarasi">🖼 Rasm</button>`:''}<button class="sm" data-label="${p.id}">Etiketka</button><button class="sm" data-stk="p${p.id}">Yopishtirgich</button></div></td></tr>`).join('')}
     </tbody></table></div></section>`;}).join('')||`<section class="panel"><p class="muted" style="margin:0">${q||oLow?'Hech narsa topilmadi':'Bu bo\'limda tovar yo\'q'}</p></section>`}
   ${owner()?'':`<section class="panel"><div class="lock" style="margin:0">${canStock()?'Kelish narxlari faqat rahbarga ko\'rinadi.':'Kelish narxi va kirim faqat rahbar rejimida ko\'rinadi.'}</div></section>`}
   ${owner()?movesPanel():''}`;
@@ -550,8 +550,9 @@ function repRow(r){const ag=repAge(r), dn=r.status==='berildi';return `<tr data-
       <td>${esc(r.device)}${r.model?' · '+esc(r.model):''}<div class="small muted">${esc(r.problem)}</div><div class="small muted">Usta: ${esc(uName(r.masterId))}</div></td>
       <td><select data-st="${r.talon}" style="width:auto;padding:4px 8px" aria-label="Holati">${STATUSES.map(s=>`<option value="${s[0]}" ${s[0]===r.status?'selected':''}>${s[1]}</option>`).join('')}</select>
         <div style="margin-top:4px"><span class="status s-${r.status}">${stName(r.status)}</span></div>${r.pickupTs&&r.status==='tayyor'?`<div class="chip ok" style="margin-top:4px;font-size:12px" title="Mijoz botda bosgan vaqt: ${dts(r.pickupTs)}">🚗 Mijoz olib ketishga keladi</div>`:''}</td>
-      <td class="r"><input data-fee="${r.talon}" type="number" step="any" min="0" value="${r.feeUzs||''}" style="width:110px;text-align:right" class="num" aria-label="Narx"></td>
-      <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-talon="${r.talon}">Talon</button><button class="sm" data-redit="${r.talon}">Tahrirlash</button><button class="sm" data-stk="r${r.talon}">Yopishtirgich</button></div></td></tr>`;}
+      <td class="r"><input data-fee="${r.talon}" type="number" step="any" min="0" value="${r.feeUzs||''}" style="width:110px;text-align:right" class="num" aria-label="Narx">${(()=>{const pt=talonParts(r.talon), ws=talonWorkers(r.talon);
+        return `${pt?`<div class="small muted num" title="Ombordan shu talonga sotilgan zapchastlar">🧩 +${fmt(pt)}</div><div class="small num"><b>Jami: ${fmt((r.feeUzs||0)+pt)}</b></div>`:''}${ws.length?`<div class="small muted" title="Ish bo'lingan">${ws.map(w=>esc(uName(w.userId).split(' ')[0])+': '+fmt(w.amount)).join('<br>')}</div>`:''}`;})()}</td>
+      <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-talon="${r.talon}">Talon</button><button class="sm" data-redit="${r.talon}">Tahrirlash</button><button class="sm" data-stk="r${r.talon}">Yopishtirgich</button><button class="sm" data-rpart="${r.talon}" title="Ombordan zapchast sotish (shu talonga)">🧩 Zapchast</button>${owner()||r.masterId===S.cur?`<button class="sm" data-rwork="${r.talon}" title="Servis summasini ustalarga bo'lish (KPI)">👥 Ish</button>`:''}</div></td></tr>`;}
 
 function tkAttr(){const w=Math.min(120,Math.max(40,+S.printers.receiptW||80)), z=Math.min(2,Math.max(.6,+S.printers.receiptFont||1)), h=+S.printers.receiptH||0;return `data-w="${w>=70?80:58}" style="width:${w}mm;--tkz:${z}${h?`;min-height:${h}mm`:''}"`;}
 /* Chekka qo'shimcha matn (Sozlamalar → Printerlar) */
@@ -573,7 +574,9 @@ function ticketHtml(r){
   <div class="f"><span>Mijoz</span><span>${esc(r.name)}</span><span>Tel</span><span>${esc(r.phone)}</span>${r.phone2?`<span>Tel 2</span><span>${esc(r.phone2)}</span>`:''}
   <span>Qurilma</span><span>${esc(r.device)} ${esc(r.model||'')}</span>${r.serial?`<span>S/N</span><span>${esc(r.serial)}</span>`:''}
   ${r.acc?`<span>Komplekt</span><span>${esc(r.acc)}</span>`:''}<span>Muammo</span><span>${esc(r.problem)}</span>
-  ${r.feeUzs?`<span>Narx ~</span><span>${fmt(r.feeUzs)} so'm</span>`:''}
+  ${r.feeUzs?`<span>${talonParts(r.talon)?'Servis':'Narx ~'}</span><span>${fmt(r.feeUzs)} so'm</span>`:''}
+  ${talonSales(r.talon).map(s=>s.items.map(i=>`<span>Zapchast</span><span>${esc(i.name)} ×${i.qty} — ${fmt(i.priceUzs*i.qty)}</span>`).join('')).join('')}
+  ${talonParts(r.talon)?`<span><b>Jami</b></span><span><b>${fmt((r.feeUzs||0)+talonParts(r.talon))} so'm</b></span>`:''}
   ${r.acceptedBy?`<span>Qabul qildi</span><span>${esc(uName(r.acceptedBy))}</span>`:''}${r.masterId?`<span>Usta</span><span>${esc(uName(r.masterId))}</span>`:''}</div>
   ${talonBotHtml(r)}<hr>${contactsHtml('servis')}<div class="c" style="margin-top:3px">Qurilmani olishda talonni ko'rsating</div>${ckText(S.printers.tkBottom)}</div>`;
 }
@@ -792,10 +795,11 @@ function vXodimlar(){
   ${S.mods.salary?`<section class="panel"><h2>Oylik hisobi · ${today().slice(0,7)}</h2>
   <div class="tbl"><table><thead><tr><th>Xodim</th><th class="r">Oklad</th><th class="r">KPI</th><th class="r">Hisoblangan</th><th class="r">Berilgan</th><th class="r">Qoldiq</th><th></th></tr></thead><tbody>
   ${S.users.filter(u=>u.role!=='owner'&&u.active).map(u=>{const p=payroll(u);
-    return `<tr><td>${esc(u.name)}<div class="small muted">${u.kpi}% ${kpiLabel(u)}</div></td><td class="r num">${fmt(u.oklad)}</td><td class="r num">${fmt(p.kpiSum)}</td>
+    return `<tr><td>${esc(u.name)}<div class="small muted">${u.kpi}% ${kpiLabel(u)}</div></td><td class="r num">${fmt(u.oklad)}</td><td class="r num">${fmt(p.kpiSum)}${p.bonus?`<div class="small muted">shundan qo'lda: ${p.bonus<0?'−':''}${fmt(Math.abs(p.bonus))}</div>`:''}</td>
     <td class="r num">${fmt(p.total)}</td><td class="r num">${fmt(p.paid)}</td><td class="r num"><b>${fmt(p.left)}</b></td>
-    <td><div class="row" style="flex-wrap:nowrap"><button class="sm pri" data-salpay="${u.id}">Oylik berish</button><button class="sm" data-pay="${u.id}">Sozlash</button></div></td></tr>`}).join('')}
-  </tbody></table></div><p class="small muted">Berilgan oylik avtomatik "Oylik / avans" rasxodi bo'lib yoziladi va sizga bildirishnoma keladi.</p></section>
+    <td><div class="row" style="flex-wrap:nowrap"><button class="sm pri" data-salpay="${u.id}">Oylik berish</button><button class="sm" data-kpiadd="${u.id}" title="Qo'lda KPI qo'shish (masalan noutbuk sotgani uchun)">+ KPI</button><button class="sm" data-salchek="${u.id}" title="Oylik cheki: oklad, KPI sabablari, berilgan">🧾 Chek</button><button class="sm" data-pay="${u.id}">Sozlash</button></div></td></tr>`}).join('')}
+  </tbody></table></div><p class="small muted">Berilgan oylik avtomatik "Oylik / avans" rasxodi bo'lib yoziladi va sizga bildirishnoma keladi. Oylik berilgach chek o'zi chiqadi.</p></section>
+  ${kbonPanel()}
   ${salaryHistory()}`:''}
   <section class="panel"><h2>Yangi xodim qo'shish</h2><form id="userF" class="form">
     <label>Ism<input id="u_name" required></label>
@@ -1076,7 +1080,7 @@ function vRasxod(){
     ${byCat.slice(0,2).map(([k,v])=>`<div class="stat"><div class="k">${CATS[k]}</div><div class="v">${fmt(v)}</div></div>`).join('')}</div>
     <div class="tbl" style="margin-top:14px"><table><thead><tr><th>Sana</th><th>Turi</th><th>Izoh</th>${owner()?'<th>Kiritgan</th>':''}<th class="r">Summa</th>${owner()?'<th></th>':''}</tr></thead><tbody>
     ${list.slice().reverse().map(e=>`<tr data-ts="${e.ts||0}"><td class="num small">${dts(e.ts)}</td><td>${CATS[e.cat]}${e.toUser?`<div class="small muted">→ ${esc(uName(e.toUser))}</div>`:''}</td><td>${esc(e.note)}</td>
-    ${owner()?`<td>${esc(uName(e.userId))}</td>`:''}<td class="r num">${fmt(e.amountUzs)}</td>${owner()?`<td><button class="sm ghost" data-delexp="${e.id}" aria-label="O'chirish">✕</button></td>`:''}</tr>`).join('')||`<tr><td colspan="6" class="muted">Bu oyda rasxod yo'q</td></tr>`}
+    ${owner()?`<td>${esc(uName(e.userId))}</td>`:''}<td class="r num">${fmt(e.amountUzs)}</td>${owner()?`<td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-expedit="${e.id}" title="O'zgartirish">✎</button><button class="sm ghost" data-delexp="${e.id}" aria-label="O'chirish">✕</button></div></td>`:''}</tr>`).join('')||`<tr><td colspan="6" class="muted">Bu oyda rasxod yo'q</td></tr>`}
     </tbody></table></div></section>`;
 }
 function salaryCard(u){
@@ -1085,7 +1089,8 @@ function salaryCard(u){
     <div class="stat"><div class="k">Oklad</div><div class="v">${fmt(u.oklad)}</div></div>
     <div class="stat"><div class="k">KPI ${u.kpi}% · ${kpiLabel(u)}</div><div class="v">${fmt(p.kpiSum)}</div></div>
     <div class="stat"><div class="k">Berilgan (avans)</div><div class="v">${fmt(p.paid)}</div></div>
-    <div class="stat"><div class="k">Qoldiq</div><div class="v pos">${fmt(p.left)}</div></div></div></section>${salaryHistory(u.id)}`;
+    <div class="stat"><div class="k">Qoldiq</div><div class="v pos">${fmt(p.left)}</div></div></div>
+    <div class="row" style="margin-top:10px"><button class="sm" data-salchek="${u.id}">🧾 Oylik chekim (KPI nima uchun)</button></div></section>${salaryHistory(u.id)}`;
 }
 let salMon='';
 function salaryHistory(uid){
@@ -1099,7 +1104,7 @@ function salaryHistory(uid){
   <div class="tbl"><table><thead><tr><th>Sana va vaqt</th>${uid?'':'<th>Xodim</th>'}<th class="r">Summa</th><th>Turi</th><th>Izoh</th>${owner()?'<th>Kim berdi</th><th></th>':''}</tr></thead><tbody>
   ${list.map(x=>`<tr data-ts="${x.ts||0}"><td class="num">${dS(x.ts)} <span class="muted">${tS(x.ts)}</span></td>${uid?'':`<td>${esc(uName(x.toUser))}</td>`}
     <td class="r num"><b>${fmt(x.amountUzs)}</b></td><td>${x.pay==='karta'?'Karta':'Naqd'}</td><td class="small">${esc(x.note)}</td>
-    ${owner()?`<td class="small muted">${esc(uName(x.userId))}</td><td><button class="sm ghost" data-saldel="${x.id}" title="O'chirish">✕</button></td>`:''}</tr>`).join('')||`<tr><td colspan="7" class="muted">Bu oyda oylik berilmagan</td></tr>`}
+    ${owner()?`<td class="small muted">${esc(uName(x.userId))}</td><td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-salchek="${x.toUser}" data-mon="${dayOf(x.ts).slice(0,7)}" title="Oylik cheki">🧾</button><button class="sm" data-expedit="${x.id}" title="O'zgartirish">✎</button><button class="sm ghost" data-saldel="${x.id}" title="O'chirish">✕</button></div></td>`:''}</tr>`).join('')||`<tr><td colspan="7" class="muted">Bu oyda oylik berilmagan</td></tr>`}
   </tbody></table></div></section>`;
 }
 function salPayModal(id){
@@ -1113,6 +1118,138 @@ function salPayModal(id){
   <label>Izoh<input id="sp_extra" placeholder="ixtiyoriy"></label>
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Berildi</button></div></form>`);
   setTimeout(()=>document.getElementById('sp_sum')?.select(),0);
+}
+/* ---------- Qo'lda KPI, oylik cheki, rasxodni tahrirlash ---------- */
+const curMon=()=>today().slice(0,7);
+const kbonOf=(uid,m)=>(S.kbon||[]).filter(k=>k.userId===uid&&k.month===(m||curMon()));
+function kpiModal(o={}){
+  const k=o.id?(S.kbon||[]).find(x=>x.id===o.id):null;
+  const uid=k?.userId||o.userId||'', staff=S.users.filter(u=>u.role!=='owner'&&u.active);
+  modal(`<h3>${k?"KPI ni o'zgartirish":"Qo'lda KPI qo'shish"}</h3><form id="kpiF" data-id="${k?.id||''}" data-sale="${o.saleId||k?.saleId||''}" data-talon="${o.talon||k?.talon||''}" style="display:grid;gap:10px">
+  <label>Xodim<select id="kb_u" required>${staff.map(u=>`<option value="${u.id}" ${u.id===uid?'selected':''}>${esc(u.name)}</option>`).join('')}</select></label>
+  <label>Summa (so'm)<input id="kb_sum" type="number" step="any" required class="num" style="font-size:20px" value="${k?k.amount:''}" placeholder="masalan 100000"></label>
+  <label>Sababi<input id="kb_reason" list="kbReasons" required value="${esc(k?.reason||o.reason||'')}" placeholder="Noutbuk sotgani uchun"></label>
+  <datalist id="kbReasons"><option>Noutbuk sotgani uchun</option><option>Kompyuter yig'gani uchun</option><option>Qo'shimcha ish uchun</option><option>Bonus</option><option>Jarima</option></datalist>
+  <label>Qaysi oy oyligiga<input id="kb_mon" type="month" required value="${k?.month||curMon()}"></label>
+  <p class="small muted" style="margin:0">Bu summa xodimning shu oy KPI siga qo'shiladi va oylik chekida sababi bilan chiqadi. Jarima uchun minus summa yozing (masalan −50000).</p>
+  <div class="row" style="justify-content:flex-end">${k?`<button type="button" class="ghost" data-kbdel="${k.id}">O'chirish</button>`:''}<button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div></form>`);
+  setTimeout(()=>document.getElementById('kb_sum')?.focus(),0);
+}
+function kbonPanel(){
+  const m=curMon(), L=(S.kbon||[]).filter(k=>k.month===m);
+  return `<section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Qo'lda qo'yilgan KPI · ${m}</h2><button class="sm pri" data-kpiadd="">+ KPI qo'shish</button></div>
+  <div class="tbl"><table><thead><tr><th>Sana</th><th>Xodim</th><th>Sababi</th><th class="r">Summa</th><th></th></tr></thead><tbody>
+  ${L.map(k=>`<tr><td class="num small">${dts(k.ts)}</td><td>${esc(uName(k.userId))}</td><td>${esc(k.reason)}${k.saleId?` <span class="small muted">(sotuv №${esc(String(S.sales.find(s=>s.id===k.saleId)?.no||''))})</span>`:''}</td>
+    <td class="r num"><b>${k.amount<0?'−':''}${fmt(Math.abs(k.amount))}</b></td><td><button class="sm" data-kpiedit="${k.id}" title="O'zgartirish">✎</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">Bu oyda qo\'lda KPI qo\'yilmagan. Sotuvlar ro\'yxatida har bir sotuv yonidagi "+KPI" tugmasi bilan ham qo\'yish mumkin.</td></tr>'}
+  </tbody></table></div></section>`;
+}
+const ROLE_NM={usta:'Usta',sotuvchi:'Sotuvchi',usta_sotuvchi:'Usta va sotuvchi'};
+async function salChekModal(uid,mon){
+  mon=mon||curMon();
+  modal(`<h3>Oylik cheki</h3><p class="muted">Hisoblanmoqda…</p>`);
+  const {data:d,error}=await db.rpc('payroll_detail',{p_user:uid,p_month:mon});
+  if(error){closeModal();return toast(error.message);}
+  const n=x=>fmt(Math.round(+x||0)), ln=(a,b,st='')=>`<div class="kv" ${st?`style="${st}"`:''}><span>${a}</span><span>${b}</span></div>`;
+  const reps=d.repairs||[], sales=d.sales||[], rets=d.returns||[], bon=d.bonuses||[], pays=d.payments||[];
+  const kp=+d.kpi||0, base=+d.base||0, kpiCalc=Math.round(base*kp/100);
+  const repSum=reps.reduce((a,r)=>a+(+r.amount||0),0), salT=sales.reduce((a,x)=>a+x.qty*x.price,0), salP=sales.reduce((a,x)=>a+(+x.profit||0),0);
+  const tush=d.kpi_base==='tushum';
+  modal(`<h3>Oylik cheki · ${esc(d.name)}</h3><div class="ticket" ${tkAttr()}>
+  <div class="hd"><b>${esc(S.company.name)}</b><br>OYLIK HISOBI</div><hr>
+  ${ln('Xodim:','<b>'+esc(d.name)+'</b>')}${ln('Lavozim:',esc(ROLE_NM[d.role]||d.role))}${ln('Oy:',esc(mon))}${ln('Chek sanasi:',dts(Date.now()))}<hr>
+  ${ln('Oklad:',n(d.oklad))}
+  ${reps.length?`<hr><div><b>Servis ishlari (${reps.length} ta)</b></div>${reps.map(r=>ln(`№${tn(r.talon)} ${esc(r.device||'')}${r.shared?` <span class="small">(ulushi, jami ${n(r.fee)})</span>`:''}`,n(r.amount))).join('')}${ln('Servis jami:','<b>'+n(repSum)+'</b>')}`:''}
+  ${sales.length?`<hr><div><b>Sotuvlar (${sales.length} qator)</b></div>${sales.map(x=>ln(`№${x.no} ${esc(x.name)} ×${x.qty}`,n(x.qty*x.price)+(tush?'':` <span class="small">(f ${n(x.profit)})</span>`))).join('')}
+    ${ln('Sotuv tushumi:',n(salT))}${tush?'':ln('Sotuv foydasi:',n(salP))}`:''}
+  ${rets.length?`${rets.map(x=>ln(`Vazvrat: ${esc(x.name)} ×${x.qty}`,'−'+n(tush?x.refund:x.profit))).join('')}`:''}
+  ${kp?`<hr>${ln(`KPI ${kp}% × ${n(base)}:`,'<b>'+n(kpiCalc)+'</b>')}`:''}
+  ${bon.length?`<hr><div><b>Qo'shimcha KPI</b></div>${bon.map(b=>ln(esc(b.reason||'KPI')+` <span class="small">${dS(ms(b.ts))}</span>`,(b.amount<0?'−':'+')+n(Math.abs(b.amount)))).join('')}${ln("Qo'shimcha jami:",'<b>'+n(d.bonus)+'</b>')}`:''}
+  <hr>${ln('KPI jami:',n(d.kpi_sum))}
+  ${ln('HISOBLANGAN:',n(d.total)+" so'm",'font-size:13px;font-weight:800')}
+  ${pays.length?`<hr><div><b>Berilganlar</b></div>${pays.map(p=>ln(`${dS(ms(p.ts))} ${esc(p.note||'Oylik')}${p.pay==='karta'?' (karta)':''}`,n(p.amount))).join('')}`:''}
+  ${ln('Berildi jami:',n(d.paid))}
+  ${ln('QOLDIQ:',n(d.left)+" so'm",'font-size:13px;font-weight:800')}<hr>
+  <div style="margin-top:10px">Xodim imzosi: ____________</div><div style="margin-top:8px">Rahbar imzosi: ____________</div></div>
+  <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button>${printBtn('ticket')}</div>`);
+}
+const EXP_CATS=()=>Object.entries(CATS);
+function expEditModal(id){
+  const e=S.expenses.find(x=>x.id===id)||S.salPays.find(x=>x.id===id); if(!e) return toast('Topilmadi');
+  const cat=e.cat||'oylik', staff=S.users.filter(u=>u.role!=='owner');
+  modal(`<h3>Rasxodni o'zgartirish</h3><form id="expEditF" data-id="${e.id}" style="display:grid;gap:10px">
+  <label>Turi<select id="ee_cat">${EXP_CATS().map(([k,t])=>`<option value="${k}" ${k===cat?'selected':''}>${esc(t)}</option>`).join('')}</select></label>
+  <label>Xodim (oylik uchun)<select id="ee_to"><option value="">—</option>${staff.map(u=>`<option value="${u.id}" ${u.id===e.toUser?'selected':''}>${esc(u.name)}</option>`).join('')}</select></label>
+  <label>Summa (so'm)<input id="ee_sum" type="number" min="1" step="any" required class="num" value="${e.amountUzs}" style="font-size:20px"></label>
+  <div class="row" style="flex-wrap:nowrap"><label style="flex:1">Sana<input id="ee_date" type="date" required value="${dayOf(e.ts)}"></label><label style="flex:1">Vaqt<input id="ee_time" type="time" required value="${tS(e.ts).slice(0,5)}"></label></div>
+  <label>To'lov<select id="ee_pay"><option value="naqd" ${e.pay!=='karta'?'selected':''}>Naqd</option><option value="karta" ${e.pay==='karta'?'selected':''}>Karta</option></select></label>
+  <label>Izoh<input id="ee_note" value="${esc(e.note||'')}"></label>
+  <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div></form>`);
+}
+
+/* ---------- Ustaxona: talonga zapchast sotish va ishni ustalarga bo'lish ---------- */
+const talonSales=t=>S.sales.filter(s=>s.talon===t);
+const talonParts=t=>talonSales(t).reduce((a,s)=>a+s.totalUzs,0);
+const talonWorkers=t=>(S.rworks||[]).filter(w=>w.talon===t);
+function partModal(t){
+  const r=S.repairs.find(x=>x.talon===t); if(!r) return;
+  const sold=talonSales(t), ps=S.products.filter(p=>p.qty>0);
+  modal(`<h3>Talon №${tn(t)} · zapchast sotish</h3>
+  <p class="small muted" style="margin:0 0 8px">${esc(r.name)} · ${esc(r.phone)} · ${esc(r.device)} ${esc(r.model||'')}</p>
+  ${sold.length?`<div class="tbl" style="margin-bottom:10px"><table><thead><tr><th>Sotuv</th><th>Tovar</th><th class="r">Summa</th><th></th></tr></thead><tbody>${sold.map(s=>`<tr><td class="num small">№${s.no}<br>${dts(s.ts)}</td><td>${s.items.map(i=>esc(i.name)+' ×'+i.qty).join('<br>')}</td><td class="r num">${fmt(s.totalUzs)}</td><td><button type="button" class="sm" data-receipt="${s.id}">Chek</button></td></tr>`).join('')}
+    <tr><td colspan="2"><b>Zapchast jami</b></td><td class="r num"><b>${fmt(talonParts(t))}</b></td><td></td></tr></tbody></table></div>`:''}
+  <form id="partF" data-t="${t}" style="display:grid;gap:10px">
+    <label>Tovar (nomi yoki shtrix-kodi)<input id="pt_q" list="ptList" required autocomplete="off" placeholder="Qidirish yoki skanerlash…"></label>
+    <datalist id="ptList">${ps.map(p=>`<option value="${esc(p.barcode||p.name)}">${esc(p.name)} · ${p.qty} dona · ${fmt(priceUzs(p))} so'm</option>`).join('')}</datalist>
+    <div id="pt_info" class="small muted"></div>
+    <div class="row" style="flex-wrap:nowrap"><label style="flex:1">Soni<input id="pt_qty" type="number" min="1" step="1" value="1" required class="num"></label>
+      <label style="flex:2">Narxi (so'm, 1 dona)<input id="pt_price" type="number" min="0" step="any" class="num" placeholder="asl narx"></label></div>
+    <label>To'lov<select id="pt_pay"><option value="naqd">Naqd</option><option value="karta">Karta</option><option value="otkazma">O'tkazma</option></select></label>
+    <p class="small muted" style="margin:0">Tovar ombordan ayriladi, oddiy sotuv bo'lib yoziladi (chek, foyda, sotuvchi KPI si) va shu talonga bog'lanadi.</p>
+    <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button><button class="pri">Sotish</button></div></form>`);
+  setTimeout(()=>document.getElementById('pt_q')?.focus(),0);
+}
+function partFind(q){q=String(q||'').trim().toLowerCase(); if(!q) return null;
+  return S.products.find(p=>(p.barcode||'').toLowerCase()===q)||S.products.find(p=>p.name.toLowerCase()===q)||null;}
+function workModal(t){
+  const r=S.repairs.find(x=>x.talon===t); if(!r) return;
+  const ws=talonWorkers(t), staff=S.users.filter(u=>u.active&&(u.role!=='owner'||u.id===S.cur));
+  const rows=ws.length?ws:[{userId:r.masterId||'',amount:''},{userId:'',amount:''}];
+  const opt=sel=>`<option value="">— tanlang —</option>${staff.map(u=>`<option value="${u.id}" ${u.id===sel?'selected':''}>${esc(u.name)}${u.kpi?` (KPI ${u.kpi}%)`:' (KPI yo\'q)'}</option>`).join('')}`;
+  const row=w=>`<div class="row wkrow" style="flex-wrap:nowrap"><select class="wk_u" style="flex:2">${opt(w.userId)}</select><input class="wk_a num" type="number" min="0" step="any" placeholder="so'm" value="${w.amount||''}" style="flex:1"></div>`;
+  modal(`<h3>Talon №${tn(t)} · ishni bo'lish</h3>
+  <p class="small muted" style="margin:0 0 8px">Servis narxi: <b class="num">${fmt(r.feeUzs)}</b> so'm. Kim qancha summalik ish qilganini yozing — KPI shu summadan hisoblanadi (KPI yoqilmagan xodimga yozilmaydi). Qolgan summa hech kimga KPI bo'lmaydi.</p>
+  <form id="workF" data-t="${t}" style="display:grid;gap:8px"><div id="wkRows" style="display:grid;gap:8px">${rows.map(row).join('')}</div>
+  <button type="button" class="sm" id="wkAdd" style="justify-self:start">+ Yana usta</button>
+  <div id="wkSum" class="small"></div>
+  <div class="row" style="justify-content:flex-end">${ws.length?`<button type="button" class="ghost" id="wkClear">Bo'lishni bekor qilish</button>`:''}<button type="button" data-close>Yopish</button><button class="pri">Saqlash</button></div></form>
+  <template id="wkTpl">${row({})}</template>`);
+  wkCalc();
+}
+function wkCalc(){const el=document.getElementById('wkSum'), f=document.getElementById('workF'); if(!el||!f) return;
+  const r=S.repairs.find(x=>x.talon===+f.dataset.t), sum=[...document.querySelectorAll('.wk_a')].reduce((a,x)=>a+(+x.value||0),0), left=(r?.feeUzs||0)-sum;
+  el.innerHTML=`Ustalarga: <b class="num">${fmt(sum)}</b> · qolgan: <b class="num" style="${left<0?'color:#e5484d':''}">${left<0?'−':''}${fmt(Math.abs(left))}</b> so'm${left<0?' — servis narxidan oshib ketdi':''}`;}
+
+/* ---------- Tovar rasmlari va ijtimoiy tarmoqqa post ---------- */
+function postCaption(p){
+  const c=lineOf(p.line), w=p.warranty||warLoad(p.id,p.line), parts=String(p.name).split('|').map(x=>x.trim()).filter(Boolean);
+  return [`🆕 ${parts[0]}`,...parts.slice(1).map(x=>`▫️ ${x}`),'',`💰 Narxi: ${fmt(priceUzs(p))} so'm`,
+    ...(w&&+w.n>0?[`🛡 Kafolat: ${warText(w.n,w.u)}`]:[]),...(p.qty>1?[`📦 Mavjud: ${p.qty} dona`]:[]),'',
+    ...(c.phone?[`📞 ${c.phone}`]:[]),[c.telegram&&`✈️ ${c.telegram}`,c.instagram&&`📷 ${c.instagram}`].filter(Boolean).join(' · ')].join('\n').replace(/\n{3,}/g,'\n\n').trim();
+}
+async function shareProduct(id){
+  const p=S.products.find(x=>x.id===id); if(!p) return;
+  const text=postCaption(p);
+  try{await navigator.clipboard.writeText(text);}catch{}
+  let files=[];
+  try{files=await Promise.all((p.photos||[]).slice(0,10).map(async(u,i)=>{const b=await fetch(u).then(r=>r.blob());return new File([b],`tovar-${i+1}.jpg`,{type:b.type||'image/jpeg'});}));}catch{files=[];}
+  if(files.length&&navigator.canShare?.({files})){
+    try{await navigator.share({files,text});toast("Instagram'ni tanlang — matn nusxalangan, \"Joylashtirish\" (Вставить) qiling");return;}catch(e){if(e?.name==='AbortError')return;}
+  }
+  files.forEach(f=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000);});
+  const ig=String(lineOf(p.line).instagram||'').replace(/^@/,'');
+  modal(`<h3>Instagram uchun post</h3><p class="small muted">${files.length?`Rasmlar (${files.length} ta) yuklab olindi. `:''}Matn nusxalandi. Instagram'da yangi post oching, rasmlarni tanlang va matnni joylashtiring. Telefonda bu tugma rasmni to'g'ridan-to'g'ri Instagram'ga ulashadi.</p>
+  <textarea readonly style="width:100%;min-height:180px">${esc(text)}</textarea>
+  <div class="row" style="justify-content:flex-end"><button type="button" data-close>Yopish</button><button type="button" class="pri" data-openurl="https://www.instagram.com/${esc(ig)}">Instagram'ni ochish</button></div>`);
 }
 let notifMon=null;
 function vBildirish(){
@@ -1329,11 +1466,12 @@ function pExtraModal(id){
   const p=S.products.find(x=>x.id===id); if(!p) return;
   const w=p.warranty||warLoad(p.id,p.line), ch=(FT().channels||{})[p.line]||'', last=(S.chPosts||[]).find(c=>c.productId===id);
   modal(`<h3>${esc(p.name)}</h3><form id="pxF" data-p="${id}" class="form">
-    <div class="full" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div id="px_img" style="width:110px;height:110px;flex:none;border-radius:12px;border:1px dashed var(--line);background:center/cover no-repeat ${p.photo?`url('${esc(p.photo)}')`:'transparent'};display:grid;place-items:center">${p.photo?'':'<span class="small muted">Rasm yo\'q</span>'}</div>
-      <label style="flex:1;min-width:180px">Tovar rasmi (kanal uchun)<input id="px_file" type="file" accept="image/*"><span class="small muted" style="text-transform:none;letter-spacing:0">Telefonda kamera bilan suratga olish mumkin</span></label></div>
+    <div class="full"><div class="small muted" style="margin-bottom:6px">RASMLAR (${(p.photos||[]).length}/10) — birinchisi asosiy; Telegram kanalga albom bo'lib ketadi</div>
+      <div class="phgal" id="pxGal">${(p.photos||[]).map((u,i)=>`<div class="ph ${i?'':'main'}" style="background-image:url('${esc(u)}')"><button type="button" class="phx" data-phdel="${id}" data-i="${i}" title="O'chirish">✕</button>${i?`<button type="button" class="phm" data-phmain="${id}" data-i="${i}" title="Asosiy qilish">★</button>`:''}</div>`).join('')||'<span class="small muted">Hali rasm yo\'q</span>'}</div>
+      <label style="margin-top:8px">Rasm qo'shish (bir nechtasini tanlash mumkin)<input id="px_file" type="file" accept="image/*" multiple><span class="small muted" style="text-transform:none;letter-spacing:0">Telefonda kamera bilan suratga olish mumkin. "Saqlash" bosilganda yuklanadi.</span></label><div id="px_prev" class="phgal"></div></div>
     ${warFields('px',w)}
     <label>Kam qolganda ogohlantirish: shundan kam bo'lsa<input id="px_min" type="number" min="0" step="1" value="${p.minQty??''}" placeholder="Bo'lim bo'yicha: ${+(FT().minQty||{})[p.line]||0}" class="num"><span class="small muted" style="text-transform:none;letter-spacing:0">0 — bu tovar uchun ogohlantirmaslik</span></label>
-    <div class="full row" style="justify-content:space-between;gap:8px">${ch?`<button type="button" data-chpost="${id}">📢 ${esc(ch)} kanaliga joylash</button>`:`<span class="small muted">Bu bo'lim uchun Telegram kanal yozilmagan${owner()?' (Sozlamalar → Avtomatik xabarlar va kanallar)':''}</span>`}
+    <div class="full row" style="justify-content:space-between;gap:8px"><span class="row" style="gap:8px">${ch?`<button type="button" data-chpost="${id}">📢 Telegram: ${esc(ch)}</button>`:`<span class="small muted">Bu bo'lim uchun Telegram kanal yozilmagan${owner()?' (Sozlamalar → Avtomatik xabarlar va kanallar)':''}</span>`}<button type="button" data-share="${id}" title="Rasm va tayyor matn — Instagram yoki boshqa ilovaga">📷 Instagram'ga post</button></span>
       <span class="row"><button type="button" data-close>Yopish</button><button class="pri">Saqlash</button></span></div>
     ${last?`<p class="small muted full" style="margin:0">Kanalga oxirgi joylash: ${last.postedTs?dts(last.postedTs)+' ✅':last.error?'❌ '+esc(last.error):'navbatda — 5 daqiqa ichida joylanadi'}</p>`:''}</form>`);
 }
@@ -1482,7 +1620,7 @@ async function loadDay(d) {
     must(db.from('sales').select('*, sale_items(*, sale_item_costs(*))').gte('created_at', a).lte('created_at', b).order('created_at')),
     must(db.from('sale_returns').select('*, sale_items(name, sale_item_costs(cost_usd, rate)), sales(no)').gte('created_at', a).lte('created_at', b)),
   ]);
-  extraSales[d] = ss.map((s) => ({ id: s.id, no: s.no, ts: ms(s.created_at), enteredTs: ms(s.entered_at), userId: s.user_id, pay: s.pay, totalUzs: +s.total_uzs, rate: +s.rate || 0,
+  extraSales[d] = ss.map((s) => ({ id: s.id, no: s.no, ts: ms(s.created_at), enteredTs: ms(s.entered_at), userId: s.user_id, talon: s.repair_talon || null, pay: s.pay, totalUzs: +s.total_uzs, rate: +s.rate || 0,
     items: (s.sale_items || []).map((i) => { const c = one(i.sale_item_costs); return { id: i.id, name: i.name, line: i.line, qty: i.qty, priceUzs: +i.price_uzs, listUzs: +(i.list_price_uzs || i.price_uzs), costUsd: +(c?.cost_usd || 0), rate: +(c?.rate || s.rate) }; }) }));
   extraReturns[d] = rr.map(mapReturn);
 }
@@ -1510,7 +1648,7 @@ async function refresh() {
   const dpays = debtIds.length ? await must(db.from('debt_payments').select('*').in('debt_id', debtIds).order('created_at')) : [];
   const isOwn = profs.some((p) => p.id === uid && p.role === 'owner');
   const soft = (pr) => Promise.resolve(pr).then((r) => (r.error ? [] : r.data || []), () => []);
-  const [salPays, notifs, monthR, moves, vendDevs, vendInc, chPosts, spays] = await Promise.all([
+  const [salPays, notifs, monthR, moves, vendDevs, vendInc, chPosts, spays, kbon, rworks] = await Promise.all([
     soft(db.from('expenses').select('*').eq('cat', 'oylik').order('created_at', { ascending: false }).limit(1000)),
     isOwn ? soft(db.from('notifications').select('*').order('created_at', { ascending: false }).limit(150)) : Promise.resolve([]),
     isOwn ? Promise.resolve(db.rpc('month_summary', { p_month: today().slice(0, 7) })).catch(() => ({ data: null })) : Promise.resolve({ data: null }),
@@ -1519,6 +1657,8 @@ async function refresh() {
     isOwn ? soft(db.from('vend_income').select('id,created_at,device_id,amount_uzs').gte('created_at', since).order('created_at').limit(20000)) : Promise.resolve([]),
     soft(db.from('channel_posts').select('id,created_at,product_id,posted_at,error').order('created_at', { ascending: false }).limit(300)),
     soft(db.from('supplier_payments').select('*').order('created_at', { ascending: false }).limit(2000)),
+    soft(db.from('kpi_bonus').select('*').order('created_at', { ascending: false }).limit(2000)),
+    soft(db.from('repair_workers').select('*')),
   ]);
   if (S?.notifs && isOwn) {
     const known = new Set(S.notifs.map((n) => n.id + ':' + n.ts));
@@ -1537,7 +1677,7 @@ async function refresh() {
       oklad: +(payMap[p.id]?.oklad || 0), kpi: +(payMap[p.id]?.kpi || 0), kpiBase: payMap[p.id]?.kpi_base || 'foyda',
     })),
     products: prods.map((p) => ({ id: p.id, name: p.name, barcode: p.barcode, line: p.line, qty: p.qty, sellUsd: +p.sell_usd, sellUzs: p.sell_uzs == null ? null : +p.sell_uzs, lastIn: ms(p.last_in || p.created_at), costUsd: costMap[p.id] ?? 0,
-      warranty: p.warranty && typeof p.warranty === 'object' ? p.warranty : null, photo: p.photo || '', minQty: p.min_qty == null ? null : +p.min_qty })),
+      warranty: p.warranty && typeof p.warranty === 'object' ? p.warranty : null, photo: p.photo || '', photos: Array.isArray(p.photos) && p.photos.length ? p.photos.filter(Boolean) : (p.photo ? [p.photo] : []), minQty: p.min_qty == null ? null : +p.min_qty })),
     clients: cls.map((c) => ({ phone: c.phone, name: c.name, tg: !!c.tg_chat_id })),
     repairs: reps.map((r) => ({
       talon: r.talon, ts: ms(r.created_at), phone: r.client_phone, phone2: r.client_phone2 || '', phoneOld: r.client_phone_old || '', name: r.client_name, device: r.device, model: r.model || '',
@@ -1548,7 +1688,7 @@ async function refresh() {
       id: s.id, no: s.no, ts: ms(s.created_at), enteredTs: ms(s.entered_at), userId: s.user_id, pay: s.pay, totalUzs: +s.total_uzs, rate: +s.rate || 0,
       items: (s.sale_items || []).map((i) => { const c = one(i.sale_item_costs); return { id: i.id, name: i.name, line: i.line, qty: i.qty, priceUzs: +i.price_uzs, listUzs: +(i.list_price_uzs || i.price_uzs), costUsd: +(c?.cost_usd || 0), rate: +(c?.rate || s.rate) }; }),
     })),
-    expenses: exps.map((e) => ({ id: e.id, ts: ms(e.created_at), userId: e.user_id, cat: e.cat, amountUzs: +e.amount_uzs, note: e.note || '', toUser: e.to_user })),
+    expenses: exps.map((e) => ({ id: e.id, ts: ms(e.created_at), userId: e.user_id, cat: e.cat, amountUzs: +e.amount_uzs, note: e.note || '', toUser: e.to_user, pay: e.pay || 'naqd' })),
     payroll: Object.fromEntries((pr.data || []).map((x) => [x.user_id, x])),
     debts: debts.map((d) => ({ id: d.id, ts: ms(d.created_at), userId: d.user_id, supplier: d.supplier, phone: d.phone || '', type: d.item_type || '',
       name: d.item_name, qty: d.qty, amount: d.amount == null ? null : +d.amount, cur: d.currency, due: d.due_date, note: d.note || '', paid: +d.paid, closed: d.closed, barcode: d.barcode || '', productId: d.product_id,
@@ -1568,6 +1708,8 @@ async function refresh() {
     vendDevices: vendDevs.map((d) => ({ id: d.id, name: d.name, active: d.active, lastSeen: ms(d.last_seen) })),
     vend: vendInc.map((v) => ({ id: v.id, ts: ms(v.created_at), deviceId: v.device_id, amount: +v.amount_uzs })),
     chPosts: chPosts.map((c) => ({ id: c.id, ts: ms(c.created_at), productId: c.product_id, postedTs: ms(c.posted_at), error: c.error || '' })),
+    kbon: kbon.map((k) => ({ id: k.id, ts: ms(k.created_at), month: k.month, userId: k.user_id, amount: +k.amount, reason: k.reason || '', saleId: k.sale_id, talon: k.talon })),
+    rworks: rworks.map((w) => ({ talon: w.talon, userId: w.user_id, amount: +w.amount })),
     debtPays: dpays.map((x) => ({ id: x.id, debtId: x.debt_id, ts: ms(x.created_at), amount: +x.amount, note: x.note || '' })),
   };
   Object.assign(CLK, { tz: S.clock.tz || 'Asia/Tashkent', adj: +S.clock.adj || 0, sync: S.clock.sync !== false });
@@ -1743,6 +1885,38 @@ document.addEventListener('submit', async (e) => {
       if (v('e_cat') === 'oylik' && !to) return toast('Oylik uchun xodimni tanlang');
       await act(() => must(db.from('expenses').insert({ user_id: S.cur, cat: v('e_cat'), amount_uzs: +v('e_sum'), note: v('e_note'), to_user: to || null })), 'Rasxod saqlandi');
     }
+    if (id === 'kpiF') {
+      const d = e.target.dataset, sum = Math.round(+v('kb_sum') || 0);
+      if (!sum) return toast('Summani kiriting');
+      const row = { user_id: v('kb_u'), amount: sum, reason: v('kb_reason'), month: v('kb_mon') || curMon(), sale_id: d.sale || null, talon: d.talon ? +d.talon : null };
+      await act(() => must(d.id ? db.from('kpi_bonus').update(row).eq('id', d.id) : db.from('kpi_bonus').insert(row)), `${uName(row.user_id)}: KPI ${d.id ? "o'zgartirildi" : "qo'shildi"}`);
+      closeModal();
+    }
+    if (id === 'expEditF') {
+      const cat = v('ee_cat'), to = v('ee_to');
+      if (cat === 'oylik' && !to) return toast('Oylik uchun xodimni tanlang');
+      const at = uzToDate(v('ee_date'), v('ee_time') || '12:00');
+      await act(() => must(db.from('expenses').update({ cat, to_user: cat === 'oylik' ? to : null, amount_uzs: +v('ee_sum'), note: v('ee_note'), pay: v('ee_pay'), created_at: at.toISOString() }).eq('id', e.target.dataset.id)), "Rasxod o'zgartirildi");
+      closeModal();
+    }
+    if (id === 'partF') {
+      const t = +e.target.dataset.t, r = S.repairs.find((x) => x.talon === t), pr = partFind(v('pt_q')), qty = Math.max(1, Math.round(+v('pt_qty') || 1));
+      if (!pr) return toast("Tovar topilmadi — ro'yxatdan tanlang yoki shtrix-kodni skanerlang");
+      if (pr.qty < qty) return toast(`Omborda faqat ${pr.qty} dona bor`);
+      const btn = e.target.querySelector('button.pri'); if (btn) btn.disabled = true;
+      try {
+        const res = await act(() => must(db.rpc('make_sale', { p_items: [{ product_id: pr.id, qty, ...(v('pt_price') !== '' ? { price: Math.round(+v('pt_price')) } : {}) }], p_pay: v('pt_pay'), p_client: r?.phone || null, p_client_name: r?.name || null })));
+        if (res?.id) { await db.rpc('sale_link_talon', { p_sale: res.id, p_talon: t }); await refresh(); render(); }
+        toast(`№${tn(t)} talonga sotildi: ${pr.name.split('|')[0]} ×${qty}`);
+        partModal(t);
+      } catch { if (btn && document.body.contains(btn)) btn.disabled = false; }
+    }
+    if (id === 'workF') {
+      const t = +e.target.dataset.t, items = [...document.querySelectorAll('#wkRows .wkrow')].map((x) => ({ user_id: x.querySelector('.wk_u').value, amount: +x.querySelector('.wk_a').value || 0 })).filter((x) => x.user_id && x.amount > 0);
+      if (!items.length) return toast("Kamida bitta usta va summani yozing");
+      await act(() => db.rpc('repair_set_workers', { p_talon: t, p_items: items }).then(must0), "Ish bo'lindi — KPI shunga qarab hisoblanadi");
+      closeModal();
+    }
     if (id === 'salF') {
       const uidv = e.target.dataset.u, sum = +v('sp_sum') || 0;
       if (sum <= 0) return toast('Summani kiriting');
@@ -1750,7 +1924,7 @@ document.addEventListener('submit', async (e) => {
       const note = [v('sp_note'), v('sp_extra')].filter(Boolean).join(' · ');
       await act(() => must(db.from('expenses').insert({ user_id: S.cur, cat: 'oylik', amount_uzs: sum, to_user: uidv, note, pay: v('sp_pay'), created_at: at.toISOString() })),
         `${uName(uidv)}: ${fmt(sum)} so'm berildi`);
-      closeModal();
+      closeModal(); await salChekModal(uidv, dayOf(at.getTime()).slice(0, 7));
     }
     if (id === 'payF') {
       const uidv = e.target.dataset.u, pay = +v('p_pay') || 0;
@@ -1833,11 +2007,11 @@ document.addEventListener('submit', async (e) => {
       await act(() => settingsUpd({ features: f }), 'Saqlandi');
     }
     if (id === 'pxF') {
-      const pid = e.target.dataset.p, file = document.getElementById('px_file').files[0], btn = e.target.querySelector('button.pri');
+      const pid = e.target.dataset.p, files = [...(document.getElementById('px_file').files || [])], file = files[0], btn = e.target.querySelector('button.pri');
       const body = { warranty: { n: Math.max(0, Math.round(+v('px_wn') || 0)), u: v('px_wu') || 'oy' }, min_qty: v('px_min') === '' ? '' : String(Math.max(0, Math.round(+v('px_min')))) };
       if (btn) { btn.disabled = true; btn.textContent = file ? 'Rasm yuklanmoqda…' : 'Saqlanmoqda…'; }
       try {
-        if (file) body.photo = await uploadPhoto(file, pid);
+        if (files.length) { const cur = [...(S.products.find((x) => x.id === pid)?.photos || [])]; for (const f of files.slice(0, Math.max(0, 10 - cur.length))) cur.push(await uploadPhoto(f, pid)); body.photos = cur; }
         await act(() => db.rpc('product_set_extra', { p_id: pid, p: body }).then(must0), 'Saqlandi');
         warSave(pid, body.warranty.n, body.warranty.u); pExtraModal(pid);
       } finally { if (btn && document.body.contains(btn)) { btn.disabled = false; btn.textContent = 'Saqlash'; } }
@@ -1910,6 +2084,12 @@ document.addEventListener('input', (e) => {
   if (t.id === 'scanIn') {
     showSugg(t.value);
   }
+  if (t.classList?.contains('wk_a')) wkCalc();
+  if (t.id === 'pt_q') {
+    const pr = partFind(t.value), info = document.getElementById('pt_info');
+    if (info) info.innerHTML = pr ? `<b>${esc(pr.name)}</b> · omborda ${pr.qty} dona · narxi <b class="num">${fmt(priceUzs(pr))}</b> so'm` : '';
+    const pe = document.getElementById('pt_price'); if (pe && pr) pe.placeholder = String(priceUzs(pr));
+  }
   const keep = (id, set) => { if (t.id !== id) return; set(t.value); const pos = t.selectionStart; render(); const n = document.getElementById(id); n.focus(); n.setSelectionRange(pos, pos); };
   keep('oSearch', (x) => (oSearch = x)); keep('cSearch', (x) => (cSearch = x)); keep('rSearch', (x) => (rSearch = x)); keep('dSearch', (x) => (dSearch = x)); keep('nSearch', (x) => (nSearch = x));
   if (t.id === 'ns_phone') { nas.phone = t.value; const c = S.clients.find((c) => c.phone === t.value.replace(/\s/g, '')); if (c) { nas.name = c.name; const n = document.getElementById('ns_name'); if (n) n.value = c.name; } }
@@ -1953,7 +2133,7 @@ document.addEventListener('change', async (e) => {
     if (t.id === 'k_cur') setKCur(t.value);
     if (t.id === 'mvFilter') { mvFilter = t.value; keepScroll(render); }
     if (t.id === 'anFrom' || t.id === 'anTo') { anFrom = document.getElementById('anFrom').value; anTo = document.getElementById('anTo').value; keepScroll(render); }
-    if (t.id === 'px_file' && t.files[0]) { const box = document.getElementById('px_img'); if (box) { box.style.backgroundImage = `url('${URL.createObjectURL(t.files[0])}')`; box.innerHTML = ''; } }
+    if (t.id === 'px_file') { const box = document.getElementById('px_prev'); if (box) box.innerHTML = [...t.files].map((f) => `<div class="ph" style="background-image:url('${URL.createObjectURL(f)}');opacity:.7" title="Saqlash bosilganda yuklanadi"></div>`).join(''); }
     if (t.id === 'ck_tz' || t.id === 'ck_adj' || t.id === 'ck_sync') { CLK.tz = document.getElementById('ck_tz').value; CLK.adj = +document.getElementById('ck_adj').value || 0; CLK.sync = document.getElementById('ck_sync').checked; const pv = document.getElementById('ckPrev'); if (pv) pv.textContent = dts(nowFix()); }
     if (t.dataset.cp != null || t.dataset.cd != null || t.dataset.cu != null) {
       const i = +(t.dataset.cp ?? t.dataset.cd ?? t.dataset.cu), c = cart[i]; if (!c) return;
@@ -2029,6 +2209,29 @@ document.addEventListener('click', async (e) => {
         else { el.dispatchEvent(new Event('input', { bubbles: true })); const ex = S.products.some((p) => p.barcode === code); (document.getElementById(target === 'd_bar' ? (ex ? 'd_qty' : 'd_name') : (ex ? 'k_qty' : 'k_name')))?.focus(); }
       });
     }
+    if ('kpiadd' in b.dataset) kpiModal({ userId: b.dataset.kpiadd });
+    if (b.dataset.kpiedit) kpiModal({ id: b.dataset.kpiedit });
+    if (b.dataset.kpisale) {
+      const sl = S.sales.find((x) => x.id === b.dataset.kpisale), ex = (S.kbon || []).find((k) => k.saleId === b.dataset.kpisale);
+      if (ex) kpiModal({ id: ex.id });
+      else if (sl) kpiModal({ userId: sl.userId, saleId: sl.id, reason: `Sotuv №${sl.no}: ` + sl.items.map((i) => i.name.split('|')[0].trim()).join(', ') });
+    }
+    if (b.dataset.kbdel) { await act(() => must(db.from('kpi_bonus').delete().eq('id', b.dataset.kbdel)), "KPI o'chirildi"); closeModal(); }
+    if (b.dataset.salchek) await salChekModal(b.dataset.salchek, b.dataset.mon);
+    if (b.dataset.expedit) expEditModal(b.dataset.expedit);
+    if (b.dataset.rpart) partModal(+b.dataset.rpart);
+    if (b.dataset.rwork) workModal(+b.dataset.rwork);
+    if (b.id === 'wkAdd') { document.getElementById('wkRows').insertAdjacentHTML('beforeend', document.getElementById('wkTpl').innerHTML); wkCalc(); }
+    if (b.id === 'wkClear') { const t = +document.getElementById('workF').dataset.t; await act(() => db.rpc('repair_set_workers', { p_talon: t, p_items: [] }).then(must0), "Bo'lish bekor qilindi"); closeModal(); }
+    if (b.dataset.phdel || b.dataset.phmain) {
+      const pid = b.dataset.phdel || b.dataset.phmain, i = +b.dataset.i, pr = S.products.find((x) => x.id === pid); if (!pr) return;
+      const ph = [...(pr.photos || [])];
+      if (b.dataset.phdel) ph.splice(i, 1); else ph.unshift(...ph.splice(i, 1));
+      await act(() => db.rpc('product_set_extra', { p_id: pid, p: { photos: ph } }).then(must0), b.dataset.phdel ? "Rasm o'chirildi" : 'Asosiy rasm almashtirildi');
+      pExtraModal(pid);
+    }
+    if (b.dataset.share) await shareProduct(b.dataset.share);
+    if (b.dataset.openurl) window.open(b.dataset.openurl, '_blank', 'noopener');
     if (b.dataset.saldel) {
       const x = S.salPays.find((y) => String(y.id) === b.dataset.saldel);
       modal(`<h3>Oylik yozuvini o'chirish</h3><p>${esc(uName(x?.toUser))}: ${fmt(x?.amountUzs || 0)} so'm, ${x ? dts(x.ts) : ''}. O'chirilsinmi?</p>
