@@ -62,7 +62,7 @@
 - Rangli qatorlar: sariq — qarzda, ko'k — topshirilgan, yashil — qarzi berilgan, qizil — muddati o'tgan
 - **Ombor bo'limlarga ajratilgan:** tepada bo'lim kartalari (Hammasi / Noutbuklar / Kompyuter / qo'lda yaratilganlar — xil, dona, kam qolgan, qiymat); har bo'lim alohida jadvalda; kartani bossangiz faqat o'sha bo'lim, kirim formasida bo'lim o'zi tanlanadi
 
-> ⏳ **Joylash kutilmoqda (2026-11-12):** qarz bo'limlari va omborni bo'limlarga ajratish kodi tayyor (`manba/app/src/main.js`), lekin sayt hali oldingi versiyada. Kompyuterdagi Claude ilovasi ochiq bo'lganda tartib: 1) Supabase SQL editor'da `manba/supabase/migrations/0022_qarz_bolim.sql` ni ishga tushirish; 2) `tick` funksiyasini `manba/deploy/tick.ts` bilan yangilash; 3) `manba/app` dan `npx vite build` qilib, `dist/*` ni repo ildiziga joylash va push.
+> ✅ **Joylandi (2026-11-12):** 0022 bazaga qo'yildi, `tick` yangilandi, sayt yangi versiyada.
 
 ## Kelishuvlar
 - Javoblar o'zbek tilida
