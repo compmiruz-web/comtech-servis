@@ -66,7 +66,8 @@ const canStock=()=>owner()||(S.mods.stockin!==false&&me().canStock);
 const canDebt=()=>S.mods.debts!==false&&(owner()||me().canDebt);
 const monthOf=ts=>dayOf(ts).slice(0,7);
 function payroll(u){const p=S.payroll[u.id]||{};return {base:+p.base||0,bonus:+p.bonus||0,fixed:+p.fixed||0,kpiSum:+p.kpi_sum||0,total:+p.total||0,paid:+p.paid||0,left:+p.left_to_pay||0};}
-const fxLabel=u=>Object.entries(u.fixedKpi||{}).filter(([,a])=>+a>0).map(([k,a])=>`${lineNm(k)}: ${fmt(+a)} so'm/dona`).join(', ');
+const fxAll=u=>{const f=u.fixedKpi||{}, o={}; for(const [k,a] of Object.entries(f)){if(k.endsWith('_off')){const b=k.slice(0,-4); if(!(+f[b]>0)) o[b]={amt:+a,on:false};} else if(+a>0) o[k]={amt:+a,on:true};} return o;};
+const fxLabel=u=>Object.entries(u.fixedKpi||{}).filter(([k,a])=>!k.endsWith('_off')&&+a>0).map(([k,a])=>`${lineNm(k)}: ${fmt(+a)} so'm/dona`).join(', ');
 const kpiLabel=u=>{const sv=u.kpiBase==='tushum'?'savdo tushumi':'savdo foydasi'; return (fxLabel(u)?fxLabel(u)+' · qolgani: ':'')+(u.role==='usta'?'topshirilgan remontlar summasidan':u.role==='usta_sotuvchi'?`remontlar summasi + ${sv}dan`:`${sv}dan`);};
 const C128=('212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 '+
 '221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 '+
@@ -796,7 +797,7 @@ function vXodimlar(){
   ${S.mods.salary?`<section class="panel"><h2>Oylik hisobi · ${today().slice(0,7)}</h2>
   <div class="tbl"><table><thead><tr><th>Xodim</th><th class="r">Oklad</th><th class="r">KPI</th><th class="r">Hisoblangan</th><th class="r">Berilgan</th><th class="r">Qoldiq</th><th></th></tr></thead><tbody>
   ${S.users.filter(u=>u.role!=='owner'&&u.active).map(u=>{const p=payroll(u);
-    return `<tr><td>${esc(u.name)}<div class="small muted">${u.kpi}% ${kpiLabel(u)}</div></td><td class="r num">${fmt(u.oklad)}</td><td class="r num">${fmt(p.kpiSum)}${p.bonus?`<div class="small muted">shundan qo'lda: ${p.bonus<0?'−':''}${fmt(Math.abs(p.bonus))}</div>`:''}${p.fixed?`<div class="small muted">qat'iy (noutbuk va h.k.): ${fmt(p.fixed)}</div>`:''}</td>
+    return `<tr><td>${esc(u.name)}<div class="small muted">${u.kpi}% ${kpiLabel(u)}</div></td><td class="r num">${fmt(u.oklad)}</td><td class="r num">${fmt(p.kpiSum)}${p.bonus?`<div class="small muted">shundan qo'lda: ${p.bonus<0?'−':''}${fmt(Math.abs(p.bonus))}</div>`:''}${p.fixed?`<div class="small muted">qat'iy (noutbuk va h.k.): ${fmt(p.fixed)}</div>`:''}${Object.entries(fxAll(u)).map(([k,x])=>`<div style="margin-top:4px"><button class="sm ${x.on?'pri':'ghost'}" data-fxtog="${u.id}" data-k="${k}" title="Bosib yoqing yoki o'chiring">${x.on?'✅':'⛔'} ${esc(lineNm(k))} ${fmt(x.amt)}/dona: ${x.on?'yoqiq':"o'chiq"}</button></div>`).join('')}</td>
     <td class="r num">${fmt(p.total)}</td><td class="r num">${fmt(p.paid)}</td><td class="r num"><b>${fmt(p.left)}</b></td>
     <td><div class="row" style="flex-wrap:nowrap"><button class="sm pri" data-salpay="${u.id}">Oylik berish</button><button class="sm" data-kpiadd="${u.id}" title="Qo'lda KPI qo'shish (masalan noutbuk sotgani uchun)">+ KPI</button><button class="sm" data-salchek="${u.id}" title="Oylik cheki: oklad, KPI sabablari, berilgan">🧾 Chek</button><button class="sm" data-pay="${u.id}">Sozlash</button></div></td></tr>`}).join('')}
   </tbody></table></div><p class="small muted">Berilgan oylik avtomatik "Oylik / avans" rasxodi bo'lib yoziladi va sizga bildirishnoma keladi. Oylik berilgach chek o'zi chiqadi.</p></section>
@@ -1358,7 +1359,8 @@ function payModal(id){
   <label>KPI foizi (%)<input id="p_kpi" type="number" min="0" max="100" step="any" value="${u.kpi}" class="num"></label>
   ${isSeller(u)?`<label>KPI qaysi summadan<select id="p_base"><option value="foyda" ${u.kpiBase==='foyda'?'selected':''}>Savdo foydasidan</option><option value="tushum" ${u.kpiBase==='tushum'?'selected':''}>Savdo tushumidan</option></select></label>`:'<p class="small muted" style="margin:0">Usta KPI: o\'zi topshirgan remontlar summasidan</p>'}
   <div style="display:grid;gap:6px"><div class="small muted">QAT'IY KPI — har bir sotilgan dona uchun (bu bo'lim sotuvlari foizli KPI ga kirmaydi; 0 — o'chiq)</div>
-  ${lineKeys().filter(k=>k!=='servis').map(k=>`<label>${esc(lineNm(k))}: so'm / dona<input data-fxk="${k}" type="number" min="0" step="any" value="${+(u.fixedKpi||{})[k]||''}" placeholder="0" class="num"></label>`).join('')}</div>
+  ${lineKeys().filter(k=>k!=='servis').map(k=>{const x=fxAll(u)[k];return `<div class="row" style="flex-wrap:nowrap;align-items:flex-end"><label style="flex:1">${esc(lineNm(k))}: so'm / dona<input data-fxk="${k}" type="number" min="0" step="any" value="${x?x.amt:''}" placeholder="0" class="num"></label>
+    <label class="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--fg);flex-wrap:nowrap;padding-bottom:8px"><input type="checkbox" data-fxon="${k}" ${!x||x.on?'checked':''} style="width:auto"> Yoqiq</label></div>`;}).join('')}</div>
   <label>Hozir to'lash (avans/oylik, so'm)<input id="p_pay" type="number" min="0" step="any" placeholder="Qoldiq: ${fmt(p.left)}" class="num"></label>
   <div class="row" style="justify-content:flex-end"><button type="button" data-close>Bekor qilish</button><button class="pri">Saqlash</button></div></form>`);
 }
@@ -1933,7 +1935,7 @@ document.addEventListener('submit', async (e) => {
     if (id === 'payF') {
       const uidv = e.target.dataset.u, pay = +v('p_pay') || 0;
       await act(async () => {
-        const fixed_kpi = Object.fromEntries([...document.querySelectorAll('[data-fxk]')].map((x) => [x.dataset.fxk, Math.round(+x.value || 0)]).filter(([, a]) => a > 0));
+        const fixed_kpi = Object.fromEntries([...document.querySelectorAll('[data-fxk]')].map((x) => { const k = x.dataset.fxk, on = document.querySelector(`[data-fxon="${k}"]`)?.checked !== false; return [on ? k : k + '_off', Math.round(+x.value || 0)]; }).filter(([, a]) => a > 0));
         await must(db.from('staff_pay').upsert({ user_id: uidv, oklad: +v('p_oklad') || 0, kpi: +v('p_kpi') || 0, kpi_base: v('p_base') || 'foyda', fixed_kpi }));
         if (pay > 0) await must(db.from('expenses').insert({ user_id: S.cur, cat: 'oylik', amount_uzs: pay, to_user: uidv, note: 'Oylik' }));
       }, pay > 0 ? `${fmt(pay)} so'm to'landi` : 'Saqlandi');
@@ -2237,6 +2239,12 @@ document.addEventListener('click', async (e) => {
     }
     if (b.dataset.share) await shareProduct(b.dataset.share);
     if (b.dataset.openurl) window.open(b.dataset.openurl, '_blank', 'noopener');
+    if (b.dataset.fxtog) {
+      const u = S.users.find((x) => x.id === b.dataset.fxtog), k = b.dataset.k, f = { ...(u?.fixedKpi || {}) };
+      if (!u) return;
+      if (+f[k] > 0) { f[k + '_off'] = f[k]; delete f[k]; } else if (+f[k + '_off'] > 0) { f[k] = f[k + '_off']; delete f[k + '_off']; }
+      await act(() => must(db.from('staff_pay').upsert({ user_id: u.id, oklad: u.oklad, kpi: u.kpi, kpi_base: u.kpiBase, fixed_kpi: f })), `${u.name}: ${lineNm(k)} KPI ${+f[k] > 0 ? 'yoqildi' : "o'chirildi"}`);
+    }
     if (b.dataset.saldel) {
       const x = S.salPays.find((y) => String(y.id) === b.dataset.saldel);
       modal(`<h3>Oylik yozuvini o'chirish</h3><p>${esc(uName(x?.toUser))}: ${fmt(x?.amountUzs || 0)} so'm, ${x ? dts(x.ts) : ''}. O'chirilsinmi?</p>
