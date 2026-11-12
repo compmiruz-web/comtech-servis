@@ -141,6 +141,13 @@ td.r,th.r{text-align:right}
 .s-diag,.s-tamir{background:var(--warn-soft);color:var(--warn)}
 .s-tayyor{background:var(--accent-soft);color:var(--ok)}
 /* Ustaxona: muddat o'tgan sari qizarish */
+h3.rsec{font-size:16px;margin:14px 0 8px;display:inline-flex;gap:8px;align-items:center}
+.rdone{margin-top:14px;border-top:2px dashed var(--line,#3334);padding-top:4px}
+.rdone>summary{cursor:pointer;list-style:none}
+.rdone>summary::before{content:'▸ ';color:var(--muted)}
+.rdone[open]>summary::before{content:'▾ '}
+tr.rdonerow td{background:var(--sunk);opacity:.75}
+tr.rdonerow:hover td{opacity:1}
 tr.age1 td{background:color-mix(in srgb,var(--warn-soft) 55%,transparent)}
 tr.age2 td{background:var(--warn-soft)}
 tr.age2 td:first-child{box-shadow:inset 4px 0 0 var(--warn)}

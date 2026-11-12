@@ -254,7 +254,7 @@ let kCur=(()=>{try{return localStorage.getItem('comtech_kcur')||'usd'}catch{retu
 const kSym=()=>kCur==='uzs'?"so'm":'$';
 const tn=n=>String(n).padStart(4,'0');
 let lineAddCtx=null;
-let cart=[]; let tab='sotuv'; let rFilter='hammasi'; let rSearch=''; let oSearch=''; let cSearch='';
+let cart=[]; let tab='sotuv'; let rFilter='hammasi'; let rDoneOpen=false; let rSearch=''; let oSearch=''; let cSearch='';
 
 function toast(t){const el=document.getElementById('toast');el.textContent=t;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,2600);}
 
@@ -535,17 +535,24 @@ function vUstaxona(){
       <select id="rFilter" style="width:auto"><option value="hammasi" ${rFilter==='hammasi'?'selected':''}>Hammasi</option><option value="aktiv" ${rFilter==='aktiv'?'selected':''}>Faol (topshirilmagan)</option>${STATUSES.map(s=>`<option value="${s[0]}" ${rFilter===s[0]?'selected':''}>${s[1]}</option>`).join('')}</select>
       <input id="rSearch" placeholder="Talon №, telefon, ism…" value="${esc(rSearch)}" style="flex:1;min-width:160px">
     </div>
-    <div class="tbl"><table><thead><tr><th>Talon</th><th>Mijoz</th><th>Qurilma / muammo</th><th>Holati</th><th class="r">Narx</th><th></th></tr></thead><tbody>
-    ${list.map(r=>{const ag=repAge(r);return `<tr data-ts="${r.ts||0}" class="${ag.cls}" title="${ag.cls?'Servisda '+ag.txt:''}"><td class="talonno">№${tn(r.talon)}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div>${ag.cls?`<div class="agebadge">⏱ ${ag.txt}</div>`:''}</td>
+    ${(()=>{const act=list.filter(r=>r.status!=='berildi'), done=list.filter(r=>r.status==='berildi');
+      const head='<div class="tbl"><table><thead><tr><th>Talon</th><th>Mijoz</th><th>Qurilma / muammo</th><th>Holati</th><th class="r">Narx</th><th></th></tr></thead><tbody>';
+      const showAct=rFilter!=='berildi', showDone=rFilter==='hammasi'||rFilter==='berildi';
+      let h='';
+      if(showAct) h+=`<h3 class="rsec">🔧 Ustaxonada <span class="chip">${act.length} ta</span></h3>${head}${act.map(repRow).join('')||'<tr><td colspan="6" class="muted">Ustaxonada qurilma yo\'q</td></tr>'}</tbody></table></div>`;
+      if(showDone){const open=rDoneOpen||rFilter==='berildi'||!!q, lim=open?done:done.slice(0,100);
+        h+=`<details class="rdone" ${open?'open':''}><summary><h3 class="rsec">✅ Topshirilganlar <span class="chip">${done.length} ta</span></h3></summary>${head}${lim.map(repRow).join('')||'<tr><td colspan="6" class="muted">Topilmadi</td></tr>'}</tbody></table></div>${lim.length<done.length?`<p class="small muted">Oxirgi 100 tasi ko\'rsatildi — eskisini qidiruvdan toping</p>`:''}</details>`;}
+      return h;})()}
+  </section>`;
+}
+function repRow(r){const ag=repAge(r), dn=r.status==='berildi';return `<tr data-ts="${r.ts||0}" class="${dn?'rdonerow':ag.cls}" title="${ag.cls?'Servisda '+ag.txt:''}"><td class="talonno">№${tn(r.talon)}<div class="small muted num">${dS(r.ts)}<br>${tS(r.ts)}</div>${dn&&r.doneTs?`<div class="small num" style="color:var(--ok,#2bb673)">✅ ${dS(r.doneTs)}</div>`:''}${ag.cls?`<div class="agebadge">⏱ ${ag.txt}</div>`:''}</td>
       <td>${esc(r.name)}<div class="small muted num">${esc(r.phone)}</div>${r.phone2?`<div class="small muted num">2: ${esc(r.phone2)}</div>`:''}${r.phoneOld?`<div class="small muted num" title="Avvalgi (o'zgartirilgan) raqam"><s>${esc(r.phoneOld)}</s> eski</div>`:''}</td>
       <td>${esc(r.device)}${r.model?' · '+esc(r.model):''}<div class="small muted">${esc(r.problem)}</div><div class="small muted">Usta: ${esc(uName(r.masterId))}</div></td>
       <td><select data-st="${r.talon}" style="width:auto;padding:4px 8px" aria-label="Holati">${STATUSES.map(s=>`<option value="${s[0]}" ${s[0]===r.status?'selected':''}>${s[1]}</option>`).join('')}</select>
         <div style="margin-top:4px"><span class="status s-${r.status}">${stName(r.status)}</span></div>${r.pickupTs&&r.status==='tayyor'?`<div class="chip ok" style="margin-top:4px;font-size:12px" title="Mijoz botda bosgan vaqt: ${dts(r.pickupTs)}">🚗 Mijoz olib ketishga keladi</div>`:''}</td>
       <td class="r"><input data-fee="${r.talon}" type="number" step="any" min="0" value="${r.feeUzs||''}" style="width:110px;text-align:right" class="num" aria-label="Narx"></td>
-      <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-talon="${r.talon}">Talon</button><button class="sm" data-redit="${r.talon}">Tahrirlash</button><button class="sm" data-stk="r${r.talon}">Yopishtirgich</button></div></td></tr>`;}).join('')||'<tr><td colspan="6" class="muted">Topilmadi</td></tr>'}
-    </tbody></table></div>
-  </section>`;
-}
+      <td><div class="row" style="flex-wrap:nowrap"><button class="sm" data-talon="${r.talon}">Talon</button><button class="sm" data-redit="${r.talon}">Tahrirlash</button><button class="sm" data-stk="r${r.talon}">Yopishtirgich</button></div></td></tr>`;}
+
 function tkAttr(){const w=Math.min(120,Math.max(40,+S.printers.receiptW||80)), z=Math.min(2,Math.max(.6,+S.printers.receiptFont||1)), h=+S.printers.receiptH||0;return `data-w="${w>=70?80:58}" style="width:${w}mm;--tkz:${z}${h?`;min-height:${h}mm`:''}"`;}
 /* Chekka qo'shimcha matn (Sozlamalar → Printerlar) */
 const ckText=t=>String(t||'').trim()?`<div class="c ckx">${esc(String(t).trim()).replace(/\n/g,'<br>')}</div>`:'';
@@ -1582,6 +1589,7 @@ async function liveUpdate() {
   keepScroll(render);
 }
 function keepScroll(fn) { const y = window.scrollY; fn(); window.scrollTo(0, y); }
+document.addEventListener('toggle',e=>{if(e.target?.classList?.contains('rdone')) rDoneOpen=e.target.open;},true);
 document.addEventListener('focusout', () => setTimeout(() => { if (pendingRender && !busy()) { pendingRender = false; keepScroll(render); } }, 400));
 document.addEventListener('visibilitychange', () => { if (!document.hidden && db && S && !busy()) { clearTimeout(rtTimer); rtTimer = setTimeout(liveUpdate, 300); } });
 function subscribe() {
