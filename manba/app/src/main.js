@@ -48,8 +48,8 @@ const ROLES={owner:'Rahbar',usta:'Usta',sotuvchi:'Sotuvchi',usta_sotuvchi:'Usta 
 const isUsta=u=>u.role==='usta'||u.role==='usta_sotuvchi';
 const isSeller=u=>u.role==='sotuvchi'||u.role==='usta_sotuvchi';
 const ROLE_OPTS=sel=>[['usta','Usta'],['sotuvchi','Sotuvchi'],['usta_sotuvchi','Usta va sotuvchi (ikkalasi ham)']].map(([k,n])=>`<option value="${k}" ${k===sel?'selected':''}>${n}</option>`).join('');
-const SKINS=[['yashil','Yashil',['#11704a','#e1f1e9','#eef2f0']],['kok',"Ko'k",['#1f5fae','#e2ebf7','#eef2f0']],['bordo','Bordo',['#9b2c3c','#f6e3e6','#eef2f0']],
- ['binafsha','Binafsha',['#5b3fa0','#ebe5f6','#eef2f0']],['grafit','Grafit (qora)',['#f0a830','#1b1e23','#121417']],['tun','Tun (qora)',['#4fd1c5','#121a30','#0b1020']]].slice(0,6);
+const SKINS=[['aurora','Aurora (yangi)',['#7c5cff','#12b5a0','#141236']],['yashil','Yashil',['#11704a','#e1f1e9','#eef2f0']],['kok',"Ko'k",['#1f5fae','#e2ebf7','#eef2f0']],['bordo','Bordo',['#9b2c3c','#f6e3e6','#eef2f0']],
+ ['binafsha','Binafsha',['#5b3fa0','#ebe5f6','#eef2f0']],['grafit','Grafit (qora)',['#f0a830','#1b1e23','#121417']],['tun','Tun (qora)',['#4fd1c5','#121a30','#0b1020']]];
 const CATS={qism:'Ehtiyot qism',transport:'Transport',ovqat:'Ovqat',kommunal:'Kommunal / internet',ijara:'Ijara',oylik:'Oylik / avans',boshqa:'Boshqa'};
 const canExp=()=>S.mods.expenses&&(owner()||me().canExpense);
 const canReturn=()=>S.mods.returns!==false&&(owner()||me().canReturn);
@@ -250,7 +250,7 @@ function reportModal(){
   drawReport(document.getElementById('repCv'),R);
 }
 function genBarcode(){let b;do{b='20'+String(Date.now()).slice(-8)+String(Math.floor(Math.random()*90+10));}while(S.products.some(p=>p.barcode===b));return b;}
-function applySkin(){document.documentElement.dataset.skin=S.skin||'yashil';}
+function applySkin(){document.documentElement.dataset.skin=S.skin||'aurora';}
 const priceUzs=p=>p.sellUzs?+p.sellUzs:Math.ceil(p.sellUsd*S.rate/1000)*1000;
 let kCur=(()=>{try{return localStorage.getItem('comtech_kcur')||'usd'}catch{return 'usd'}})();
 const kSym=()=>kCur==='uzs'?"so'm":'$';
@@ -1736,7 +1736,7 @@ async function refresh() {
   const payMap = Object.fromEntries(pays.map((p) => [p.user_id, p]));
   const costMap = Object.fromEntries(costs.map((c) => [c.product_id, +c.cost_usd]));
   S = {
-    cur: uid, skin: S?.skin || (() => { try { return localStorage.getItem('comtech_skin') || 'yashil'; } catch { return 'yashil'; } })(),
+    cur: uid, skin: S?.skin || (() => { try { return localStorage.getItem('comtech_skin2') || 'aurora'; } catch { return 'aurora'; } })(),
     company: st.company, rate: +st.rate, rateDate: st.rate_date, nextTalon: st.next_talon,
     mods: st.mods, tg: st.tg, printers: st.printers, features: st.features || {},
     users: profs.map((p) => ({
@@ -2423,7 +2423,7 @@ document.addEventListener('click', async (e) => {
     }
     if (b.dataset.deldebtyes) { await act(() => must(db.from('supplier_debts').delete().eq('id', b.dataset.deldebtyes)), "Qarz o'chirildi"); closeModal(); }
     if (b.dataset.delexp) await act(() => must(db.from('expenses').delete().eq('id', b.dataset.delexp)), "Rasxod o'chirildi");
-    if (b.dataset.skin) { S.skin = b.dataset.skin; try { localStorage.setItem('comtech_skin', S.skin); } catch {} applySkin(); render(); }
+    if (b.dataset.skin) { S.skin = b.dataset.skin; try { localStorage.setItem('comtech_skin2', S.skin); } catch {} applySkin(); render(); }
     if (b.dataset.view !== undefined) { viewUser = b.dataset.view || null; render(); window.scrollTo(0, 0); }
     if (b.dataset.active) await act(() => adminUsers({ action: 'set_active', user_id: b.dataset.u, active: b.dataset.active === '1' }), b.dataset.active === '1' ? 'Xodim yoqildi' : "Xodim o'chirildi");
     if (b.dataset.setpin) {

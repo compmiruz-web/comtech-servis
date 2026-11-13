@@ -78,6 +78,10 @@
 - Har bir xodim kartochkasi: tushum, savdodagi ulushi (avatar halqasi), cheklar, dona, foyda, topshirilgan remontlar, vazvrat, eng ko'p sotgani; bosilsa shu kungi sotuvlari vaqti bilan; savdosi yo'qlar xira; 🥇🥈🥉 reyting
 - "Kun yetakchilari" — eng ko'p tushum keltirgan 5 tovar
 
+### 2026-11-13 (2) — Yangi dizayn "Aurora" (butun dastur)
+- Butun dastur kunlik analitika bloki uslubida: indigo→firuza nurli yon panel (telefonda pastki shishasimon panel), tepasida rangli chiziqli shishasimon kartalar, gradient tugmalar, nurli kartochkalar, gradient sarlavhalar; yorug' va qorong'i rejimda ishlaydi
+- Odatiy mavzu — "Aurora (yangi)"; eski ranglar (Yashil, Ko'k, Bordo, Binafsha, Grafit, Tun) Sozlamalar → Mavzu'da tanlanadi
+
 ## Kelishuvlar
 - Javoblar o'zbek tilida
 - Foydani faqat rahbar ko'radi

@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="uz">
+<html lang="uz" data-skin="aurora">
 <head>
 <title>COMPMIR</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b1a13">
+<meta name="theme-color" content="#141236">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icon-192.png">
@@ -327,10 +327,89 @@ body{margin:0}
 .ka-topp>div:not(.ka-eyebrow){display:grid;grid-template-columns:26px 1fr auto auto;gap:10px;align-items:center;font-size:14px}
 .ka-n{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-weight:900;font-size:12px;color:#fff;background:linear-gradient(135deg,#7c5cff,#16b59a)}
 .ka-tn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ===== Aurora — yangi asosiy dizayn (2026-11-13): indigo→firuza nur, shishasimon kartalar ===== */
+:root[data-skin="aurora"]{--g1:#7c5cff;--g2:#12b5a0;--grad:linear-gradient(120deg,var(--g1),var(--g2));
+  --bg:#f2f0fa;--surface:#ffffff;--sunk:#f6f4fd;--fg:#16132e;--muted:#69658c;--line:#e2ddf3;
+  --accent:#6447ee;--accent-ink:#fff;--accent-soft:#ece7ff;--ok:#0d8f76;--warn:#a96200;--warn-soft:#fff0d6;--bad:#cf3556;--bad-soft:#fde4ea;--info:#2b67d1;--info-soft:#e3ecff;
+  --shadow:0 1px 0 rgba(40,24,120,.04),0 14px 34px -20px rgba(60,40,160,.35);
+  --rail:#141236;--rail-fg:#efedff;--rail-muted:rgba(225,222,255,.62);--rail-line:rgba(255,255,255,.1);
+  --btn:linear-gradient(120deg,#5b3fe0,#0e8f93)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"])[data-skin="aurora"]{
+  --bg:#090a19;--surface:#121429;--sunk:#0d0f22;--fg:#e9e7fc;--muted:#9a97c2;--line:#25274b;
+  --accent:#a08cff;--accent-ink:#0d0828;--accent-soft:#241d50;--ok:#3fd6b4;--warn:#f1b55a;--warn-soft:#352812;--bad:#ff8399;--bad-soft:#3b1626;--info:#86aefc;--info-soft:#172648;
+  --shadow:0 1px 0 rgba(0,0,0,.3),0 16px 36px -18px rgba(0,0,0,.8);color-scheme:dark}}
+:root[data-theme="dark"][data-skin="aurora"]{
+  --bg:#090a19;--surface:#121429;--sunk:#0d0f22;--fg:#e9e7fc;--muted:#9a97c2;--line:#25274b;
+  --accent:#a08cff;--accent-ink:#0d0828;--accent-soft:#241d50;--ok:#3fd6b4;--warn:#f1b55a;--warn-soft:#352812;--bad:#ff8399;--bad-soft:#3b1626;--info:#86aefc;--info-soft:#172648;
+  --shadow:0 1px 0 rgba(0,0,0,.3),0 16px 36px -18px rgba(0,0,0,.8);color-scheme:dark}
+[data-skin="aurora"] body{background:
+  radial-gradient(900px 520px at 105% -8%,color-mix(in srgb,var(--g1) 16%,transparent),transparent 62%),
+  radial-gradient(780px 480px at 30% 112%,color-mix(in srgb,var(--g2) 13%,transparent),transparent 60%),var(--bg);background-attachment:fixed}
+/* rail */
+[data-skin="aurora"] .rail{background:
+  radial-gradient(rgba(255,255,255,.06) 1px,transparent 1.2px) 0 0/16px 16px,
+  radial-gradient(130% 55% at 0% 0%,#4a35b8 0,transparent 62%),
+  radial-gradient(120% 50% at 100% 100%,#0f6b66 0,transparent 62%),
+  linear-gradient(180deg,#151339,#0b1a2a);box-shadow:inset -1px 0 0 rgba(255,255,255,.06)}
+[data-skin="aurora"] .mark b i{background:linear-gradient(90deg,#b7a6ff,#4fe3cf);-webkit-background-clip:text;background-clip:text;color:transparent;filter:none}
+[data-skin="aurora"] .solder i{background:var(--grad);box-shadow:0 0 8px rgba(124,92,255,.7)}
+[data-skin="aurora"] nav.tabs a{border-radius:11px;transition:background .2s,color .2s}
+[data-skin="aurora"] nav.tabs a:hover{background:rgba(255,255,255,.07)}
+[data-skin="aurora"] nav.tabs a.on{background:linear-gradient(90deg,rgba(124,92,255,.42),rgba(18,181,160,.16));box-shadow:inset 0 0 0 1px rgba(255,255,255,.1),0 8px 20px -10px rgba(124,92,255,.8)}
+[data-skin="aurora"] nav.tabs a.on svg{stroke:#c9bdff}
+[data-skin="aurora"] nav.tabs a.on::before{background:linear-gradient(180deg,#b7a6ff,#4fe3cf);filter:none;box-shadow:0 0 10px #8f78ff}
+/* sarlavha */
+[data-skin="aurora"] .bar h1{background:linear-gradient(100deg,var(--fg) 30%,var(--accent) 75%,var(--g2));-webkit-background-clip:text;background-clip:text;color:transparent}
+[data-skin="aurora"] .bar .eyebrow{color:var(--accent);font-weight:600}
+[data-skin="aurora"] .mobmark b i{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* kartalar */
+[data-skin="aurora"] .panel{border-radius:18px;border-color:color-mix(in srgb,var(--line) 85%,var(--g1));
+  background:var(--grad) top/100% 3px no-repeat,color-mix(in srgb,var(--surface) 90%,transparent);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+[data-skin="aurora"] .panel h2{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+[data-skin="aurora"] .panel h2::before{content:"";width:9px;height:9px;border-radius:3px;background:var(--grad);box-shadow:0 0 10px color-mix(in srgb,var(--g1) 60%,transparent);flex:none}
+[data-skin="aurora"] .stat{border-radius:14px;border-color:color-mix(in srgb,var(--line) 75%,var(--g1));
+  background:radial-gradient(120% 90% at 100% 0%,color-mix(in srgb,var(--g1) 12%,transparent),transparent 60%),
+  radial-gradient(90% 80% at 0% 100%,color-mix(in srgb,var(--g2) 9%,transparent),transparent 60%),var(--surface);box-shadow:var(--shadow)}
+[data-skin="aurora"] .stat::after{background:var(--grad);box-shadow:0 0 8px color-mix(in srgb,var(--g1) 55%,transparent)}
+[data-skin="aurora"] .stat:has(.v.pos)::after{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+[data-skin="aurora"] .stat .v{font-size:24px}
+[data-skin="aurora"] .chip{border-color:color-mix(in srgb,var(--line) 70%,var(--g1));background:color-mix(in srgb,var(--surface) 85%,transparent)}
+[data-skin="aurora"] .chip.warn,[data-skin="aurora"] .chip.ok,[data-skin="aurora"] .chip.bad,[data-skin="aurora"] .chip.info{border-color:transparent}
+[data-skin="aurora"] .chip.ok{background:color-mix(in srgb,var(--ok) 14%,transparent)}
+[data-skin="aurora"] .ava{background:conic-gradient(from 200deg,var(--g1),var(--g2),var(--g1));color:#fff}
+/* tugma va maydonlar */
+[data-skin="aurora"] button{border-radius:11px}
+[data-skin="aurora"] button:hover{border-color:var(--accent)}
+[data-skin="aurora"] button.pri{background:var(--btn);border-color:transparent;color:#fff;box-shadow:0 8px 20px -10px rgba(91,63,224,.9)}
+[data-skin="aurora"] button.pri:hover{filter:brightness(1.1) saturate(1.1)}
+[data-skin="aurora"] button.ghost:hover{background:var(--accent-soft)}
+[data-skin="aurora"] input,[data-skin="aurora"] select,[data-skin="aurora"] textarea{border-radius:11px}
+[data-skin="aurora"] input:focus,[data-skin="aurora"] select:focus,[data-skin="aurora"] textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--g1) 22%,transparent),0 0 18px -6px var(--g1)}
+[data-skin="aurora"] .scan{border-radius:16px;background:radial-gradient(100% 140% at 0% 0%,#4a35b8,transparent 60%),radial-gradient(100% 140% at 100% 100%,#0f6b66,transparent 60%),linear-gradient(120deg,#151339,#0b1a2a);
+  background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 2px,transparent 2px 5px,rgba(255,255,255,.05) 5px 6px,transparent 6px 11px),radial-gradient(100% 140% at 0% 0%,#4a35b8,transparent 60%),radial-gradient(100% 140% at 100% 100%,#0f6b66,transparent 60%),linear-gradient(120deg,#151339,#0b1a2a)}
+/* jadvallar */
+[data-skin="aurora"] th{color:var(--accent);font-weight:700}
+[data-skin="aurora"] tbody tr:hover td{background:color-mix(in srgb,var(--g1) 7%,var(--surface))}
+[data-skin="aurora"] td.talonno{border-left:3px solid;border-image:linear-gradient(180deg,var(--g1),var(--g2)) 1}
+[data-skin="aurora"] .total .big{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+[data-skin="aurora"] .note{border-radius:12px;border:1px solid color-mix(in srgb,var(--info) 25%,transparent)}
+/* oyna, xabar, kirish */
+[data-skin="aurora"] .modal-bg{background:rgba(8,6,28,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+[data-skin="aurora"] .modal{border-radius:20px;background:var(--grad) top/100% 3px no-repeat,var(--surface);box-shadow:0 30px 70px -30px rgba(40,20,140,.6)}
+[data-skin="aurora"] .toast{background:linear-gradient(120deg,#231c5c,#0d3b44);color:#fff;box-shadow:0 12px 30px -12px rgba(60,40,180,.7)}
+[data-skin="aurora"] #gate{background:radial-gradient(rgba(255,255,255,.06) 1px,transparent 1.2px) 0 0/16px 16px,radial-gradient(70% 60% at 15% 10%,#4a35b8,transparent 65%),radial-gradient(70% 60% at 90% 95%,#0f6b66,transparent 65%),linear-gradient(160deg,#151339,#0b1a2a)}
+[data-skin="aurora"] .gate-card{border-radius:20px;background:var(--grad) top/100% 3px no-repeat,var(--surface)}
+[data-skin="aurora"] .skin.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),0 8px 20px -10px var(--g1)}
+@media (max-width:760px){
+  [data-skin="aurora"] .rail{background:linear-gradient(90deg,rgba(74,53,184,.55),transparent 45%,rgba(15,107,102,.5)),rgba(17,15,48,.92);
+    -webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);box-shadow:0 -10px 30px -12px rgba(30,20,90,.6);border-top:1px solid rgba(255,255,255,.08)}
+  [data-skin="aurora"] .panel{border-radius:16px}
+}
 </style>
 
 
-  <script type="module" crossorigin src="./assets/index-B1KNY_6K.js"></script>
+  <script type="module" crossorigin src="./assets/index-BVlqXNAy.js"></script>
 </head>
 <body>
 <div class="app">
