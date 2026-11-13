@@ -73,6 +73,11 @@
 - **Yopishtirgich:** talon raqami katta
 - **Rasmlar:** tovarga 10 tagacha (`products.photos`), Telegram kanalga albom; "📷 Instagram'ga post" — telefonda ulashish, matn nusxalanadi
 
+### 2026-11-13 — Kunlik savdo analitikasi (Hisobot, rahbar)
+- Hisobot tepasida yangi dizayndagi blok: kun tanlash (‹ › va sana), tushum, foyda, cheklar, o'rtacha chek, vazvrat — kechagiga nisbatan ▲▼ %; soatlar bo'yicha savdo grafigi (hozirgi soat ajralib turadi), to'lov turlari ulushi
+- Har bir xodim kartochkasi: tushum, savdodagi ulushi (avatar halqasi), cheklar, dona, foyda, topshirilgan remontlar, vazvrat, eng ko'p sotgani; bosilsa shu kungi sotuvlari vaqti bilan; savdosi yo'qlar xira; 🥇🥈🥉 reyting
+- "Kun yetakchilari" — eng ko'p tushum keltirgan 5 tovar
+
 ## Kelishuvlar
 - Javoblar o'zbek tilida
 - Foydani faqat rahbar ko'radi

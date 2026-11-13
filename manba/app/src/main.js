@@ -621,6 +621,68 @@ function vMijozlar(){
 }
 
 /* ---------- HISOBOT ---------- */
+/* ---------- KUNLIK SAVDO ANALITIKASI (rahbar) ---------- */
+let kaDay='', kaOpen=null;
+const KA_COL=['#7c5cff','#00b3a4','#ff7a59','#2f80ed','#e0449c','#f2a20c','#3bb273','#9b51e0'];
+function kaStat(d){
+  const ss=daySales(d), rr=dayReturns(d), sum=(l,f)=>l.reduce((a,x)=>a+f(x),0);
+  const back=sum(rr,r=>r.refund), backCost=sum(rr,r=>r.costUzs);
+  const rev=sum(ss,s=>s.totalUzs)-back, prof=sum(ss,saleProfit)-(back-backCost);
+  const by={}; const pay={};
+  ss.forEach(s=>{const u=(by[s.userId]=by[s.userId]||{id:s.userId,ss:[],rev:0,prof:0,qty:0,back:0,items:{}});
+    u.ss.push(s); u.rev+=s.totalUzs; u.prof+=saleProfit(s); s.items.forEach(i=>{u.qty+=i.qty; u.items[i.name]=(u.items[i.name]||0)+i.qty;});
+    pay[s.pay]=(pay[s.pay]||0)+s.totalUzs;});
+  rr.forEach(r=>{const s=ss.find(x=>x.id===r.saleId)||[...S.sales,...Object.values(extraSales).flat()].find(x=>x.id===r.saleId); const k=s?s.userId:r.userId;
+    const u=(by[k]=by[k]||{id:k,ss:[],rev:0,prof:0,qty:0,back:0,items:{}}); u.back+=r.refund; u.rev-=r.refund; u.prof-=(r.refund-r.costUzs);});
+  const reps=S.repairs.filter(r=>r.status==='berildi'&&r.doneTs&&dayOf(r.doneTs)===d);
+  reps.forEach(r=>{const k=r.masterId||r.acceptedBy; if(!k) return; const u=(by[k]=by[k]||{id:k,ss:[],rev:0,prof:0,qty:0,back:0,items:{}}); u.rep=(u.rep||0)+(+r.feeUzs||0); u.repN=(u.repN||0)+1;});
+  const hours=Array(24).fill(0); ss.forEach(s=>{const h=+new Intl.DateTimeFormat('en-GB',{hour:'2-digit',hourCycle:'h23',timeZone:'Asia/Tashkent'}).format(new Date(s.ts)); hours[h]+=s.totalUzs;});
+  const top={}; ss.forEach(s=>s.items.forEach(i=>{const t=(top[i.name]=top[i.name]||{name:i.name,qty:0,sum:0}); t.qty+=i.qty; t.sum+=i.qty*i.priceUzs;}));
+  return {d,ss,rr,rev,prof,back,cnt:ss.length,avg:ss.length?Math.round(sum(ss,s=>s.totalUzs)/ss.length):0,by,pay,hours,reps,top:Object.values(top).sort((a,b)=>b.sum-a.sum).slice(0,5)};
+}
+function kaDelta(a,b){ if(!b) return a?'<span class="ka-up">yangi</span>':''; const p=Math.round((a-b)/Math.abs(b)*100); return p===0?'<span class="ka-eq">±0%</span>':`<span class="${p>0?'ka-up':'ka-down'}">${p>0?'▲':'▼'} ${Math.abs(p)}%</span>`; }
+function kaInit(n){return String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();}
+function vKunlik(){
+  const d=kaDay||today(), y=ymdUz(new Date(d+'T12:00:00').getTime()-864e5), T=kaStat(d), Y=kaStat(y);
+  const staff=S.users.filter(u=>u.active!==false), ids=new Set([...staff.map(u=>u.id),...Object.keys(T.by)]);
+  const rows=[...ids].map((id,i)=>{const u=S.users.find(x=>x.id===id)||{name:'—',role:''}; const b=T.by[id]||{ss:[],rev:0,prof:0,qty:0,back:0,items:{}}; const yb=Y.by[id];
+    return {id,u,b,yrev:yb?yb.rev:0,col:KA_COL[(S.users.findIndex(x=>x.id===id)+8)%8]};}).sort((a,b)=>b.b.rev-a.b.rev||(b.b.rep||0)-(a.b.rep||0)||a.u.name.localeCompare(b.u.name));
+  const maxRev=Math.max(1,...rows.map(r=>r.b.rev)), totRev=Math.max(1,T.rev);
+  const hs=T.hours.slice(8,22), hmx=Math.max(1,...hs), nowH=+new Intl.DateTimeFormat('en-GB',{hour:'2-digit',hourCycle:'h23',timeZone:'Asia/Tashkent'}).format(new Date());
+  const payTot=Math.max(1,Object.values(T.pay).reduce((a,v)=>a+v,0)), PC={naqd:'#3bb273',karta:'#2f80ed',otkazma:'#9b51e0',nasiya:'#ff7a59'};
+  const medal=i=>['🥇','🥈','🥉'][i]||'';
+  const dl=new Date(d+'T12:00:00'); const WD=['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba'][dl.getDay()];
+  return `<section class="ka">
+  <div class="ka-hero">
+    <div class="ka-glow"></div>
+    <div class="ka-top"><div><div class="ka-eyebrow">Kunlik savdo analitikasi</div><div class="ka-date">${WD}, ${d.split('-').reverse().join('.')}${d===today()?' <span class="ka-live">● JONLI</span>':''}</div></div>
+      <div class="ka-nav"><button type="button" data-kad="-1" aria-label="Oldingi kun">‹</button><input type="date" id="kaDay" value="${d}" max="${today()}"><button type="button" data-kad="1" aria-label="Keyingi kun" ${d>=today()?'disabled':''}>›</button></div></div>
+    <div class="ka-big"><div class="ka-k">Savdo tushumi</div><div class="ka-v num">${fmt(T.rev)} <small>so'm</small></div><div class="ka-cmp">kechagiga nisbatan ${kaDelta(T.rev,Y.rev)}</div></div>
+    <div class="ka-kpis">
+      <div><span>Foyda</span><b class="num">${fmt(T.prof)}</b>${kaDelta(T.prof,Y.prof)}</div>
+      <div><span>Cheklar</span><b class="num">${T.cnt}</b>${kaDelta(T.cnt,Y.cnt)}</div>
+      <div><span>O'rtacha chek</span><b class="num">${fmt(T.avg)}</b></div>
+      <div><span>Vazvrat</span><b class="num">${T.back?'−'+fmt(T.back):'0'}</b></div></div>
+    <div class="ka-hours" title="Soatlar bo'yicha savdo">${hs.map((v,i)=>{const h=i+8;return `<div class="ka-h ${d===today()&&h===nowH?'now':''}" title="${h}:00 — ${fmt(v)} so'm"><i style="height:${v?Math.max(6,v/hmx*100):2}%"></i><em>${h%2===0?h:''}</em></div>`;}).join('')}</div>
+    ${T.cnt?`<div class="ka-pay">${Object.entries(T.pay).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<i style="flex:${v};background:${PC[k]||'#888'}" title="${PAYN[k]||k}: ${fmt(v)}"></i>`).join('')}</div>
+      <div class="ka-paylg">${Object.entries(T.pay).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span><i style="background:${PC[k]||'#888'}"></i>${PAYN[k]||k} <b class="num">${Math.round(v/payTot*100)}%</b></span>`).join('')}</div>`:''}
+  </div>
+  <div class="ka-team">
+    ${rows.map((r,i)=>{const b=r.b, share=Math.round(Math.max(0,b.rev)/totRev*100), topI=Object.entries(b.items).sort((x,y)=>y[1]-x[1])[0], open=kaOpen===r.id, none=!b.ss.length&&!b.rep&&!b.back;
+      return `<div class="ka-card ${none?'none':''} ${open?'open':''}" style="--c:${r.col}">
+      <button type="button" class="ka-head" data-kaopen="${r.id}">
+        <span class="ka-ava" style="background:conic-gradient(var(--c) ${share*3.6}deg, color-mix(in srgb,var(--c) 18%,transparent) 0)"><span>${esc(kaInit(r.u.name))}</span></span>
+        <span class="ka-who"><b>${medal(none?9:i)} ${esc(r.u.name)}</b><small>${esc(ROLES[r.u.role]||'')}${share&&!none?` · ${share}% savdo`:''}</small></span>
+        <span class="ka-sum"><b class="num">${fmt(b.rev)}</b><small>${kaDelta(b.rev,r.yrev)}</small></span></button>
+      <div class="ka-bar"><i style="width:${(Math.max(0,b.rev)/maxRev*100).toFixed(1)}%"></i></div>
+      <div class="ka-chips">${none?'<span>Bu kun savdo yo\'q</span>':`<span>🧾 ${b.ss.length} chek</span><span>📦 ${b.qty} dona</span><span>💰 ${fmt(b.prof)}</span>${b.rep?`<span>🔧 ${b.repN} ta · ${fmt(b.rep)}</span>`:''}${b.back?`<span class="bad">↩ −${fmt(b.back)}</span>`:''}${topI?`<span title="Eng ko'p sotgani">⭐ ${esc(String(topI[0]).split('|')[0].trim().slice(0,28))}${topI[1]>1?' ×'+topI[1]:''}</span>`:''}`}</div>
+      ${open&&b.ss.length?`<div class="ka-list">${b.ss.slice().sort((a,c)=>c.ts-a.ts).map(s=>`<div><span class="num">${tS(s.ts).slice(0,5)}</span><span>${s.items.map(it=>`${esc(String(it.name).split('|')[0].trim())}${it.qty>1?' ×'+it.qty:''}`).join(', ')}</span><b class="num">${fmt(s.totalUzs)}</b><em>${PAYN[s.pay]||s.pay}</em></div>`).join('')}</div>`:''}
+    </div>`;}).join('')}
+  </div>
+  ${T.top.length?`<div class="ka-topp"><div class="ka-eyebrow" style="color:var(--muted)">Kun yetakchilari</div>${T.top.map((t,i)=>`<div><span class="ka-n">${i+1}</span><span class="ka-tn">${esc(String(t.name).split('|')[0].trim())}</span><span class="num muted">×${t.qty}</span><b class="num">${fmt(t.sum)}</b></div>`).join('')}</div>`:''}
+  </section>`;
+}
+
 function vHisobot(){
   if(!owner()) return `<section class="panel"><div class="lock">Bu bo'lim faqat rahbar uchun.</div></section>`;
   const days=[...Array(7)].map((_,i)=>{const d=ymdUz(Date.now()-i*86400000);
@@ -634,7 +696,7 @@ function vHisobot(){
   const hasV=days.some(x=>x.vd);
   const t=days[0]; const w=days.reduce((a,x)=>({rev:a.rev+x.rev,prof:a.prof+x.prof,rep:a.rep+x.rep,exp:a.exp+x.exp,net:a.net+x.net}),{rev:0,prof:0,rep:0,exp:0,net:0});
   const max=Math.max(1,...days.map(x=>Math.abs(x.net)));
-  return `<section class="panel"><h2>Bugun</h2><div class="stats">
+  return `${vKunlik()}<section class="panel"><h2>Bugun</h2><div class="stats">
     <div class="stat"><div class="k">Savdo tushumi</div><div class="v">${fmt(t.rev)}</div></div>
     <div class="stat"><div class="k">Savdo foydasi</div><div class="v pos">${fmt(t.prof)}</div></div>
     <div class="stat"><div class="k">Remont tushumi</div><div class="v">${fmt(t.rep)}</div></div>
@@ -2158,6 +2220,7 @@ document.addEventListener('change', async (e) => {
     if (t.id === 'pay') { payMode = t.value; render(); }
     if (t.id === 'ns_phone' || t.id === 'ns_pre') keepScroll(render);
     if (t.id === 'saleDate') { saleDate = t.value && t.value <= today() ? t.value : today(); render(); }
+    if (t.id === 'kaDay') { const d = t.value && t.value <= today() ? t.value : today(); await loadDay(d); kaDay = d; kaOpen = null; keepScroll(render); }
     if (t.id === 'histDay') { const d = t.value && t.value <= today() ? t.value : today(); await loadDay(d); histDay = d; render(); }
     if (t.id === 'rt_item') { const o = t.selectedOptions[0]; const q = document.getElementById('rt_qty'); q.max = o.dataset.left; if (+q.value > +o.dataset.left) q.value = o.dataset.left; }
     if (t.id && t.id.startsWith('sk_')) { drawStickers(t.id === 'sk_size'); if (t.id === 'sk_wn' || t.id === 'sk_wu') { const n = document.getElementById('sk_wn').value, u = document.getElementById('sk_wu').value; if (stkCtx.pid) warSave(stkCtx.pid, n, u); else if (stkCtx.line === 'servis') warSave('servis', n, u); } }
@@ -2296,6 +2359,8 @@ document.addEventListener('click', async (e) => {
     }
     if (b.dataset.pedit) productEditModal(b.dataset.pedit);
     if (b.dataset.pextra) pExtraModal(b.dataset.pextra);
+    if (b.dataset.kad) { const d = ymdUz(new Date((kaDay || today()) + 'T12:00:00').getTime() + (+b.dataset.kad) * 864e5); if (d <= today()) { await loadDay(d); kaDay = d; kaOpen = null; keepScroll(render); } }
+    if (b.dataset.kaopen) { kaOpen = kaOpen === b.dataset.kaopen ? null : b.dataset.kaopen; keepScroll(render); }
     if (b.dataset.olow) { oLow = !oLow; keepScroll(render); }
     if (b.dataset.oline !== undefined) { oLine = b.dataset.oline; keepScroll(render); }
     if (b.dataset.anp) { anPeriod = b.dataset.anp; keepScroll(render); }
