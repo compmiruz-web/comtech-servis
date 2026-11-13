@@ -635,18 +635,36 @@ function kaStat(d){
   rr.forEach(r=>{const s=ss.find(x=>x.id===r.saleId)||[...S.sales,...Object.values(extraSales).flat()].find(x=>x.id===r.saleId); const k=s?s.userId:r.userId;
     const u=(by[k]=by[k]||{id:k,ss:[],rev:0,prof:0,qty:0,back:0,items:{}}); u.back+=r.refund; u.rev-=r.refund; u.prof-=(r.refund-r.costUzs);});
   const reps=S.repairs.filter(r=>r.status==='berildi'&&r.doneTs&&dayOf(r.doneTs)===d);
-  reps.forEach(r=>{const k=r.masterId||r.acceptedBy; if(!k) return; const u=(by[k]=by[k]||{id:k,ss:[],rev:0,prof:0,qty:0,back:0,items:{}}); u.rep=(u.rep||0)+(+r.feeUzs||0); u.repN=(u.repN||0)+1;});
+  const ub=k=>(by[k]=by[k]||{id:k,ss:[],rev:0,prof:0,qty:0,back:0,items:{}});
+  rr.forEach(r=>{const s=[...ss,...S.sales,...Object.values(extraSales).flat()].find(x=>x.id===r.saleId); const u=ub(s?s.userId:r.userId); (u.rr=u.rr||[]).push(r);});
+  reps.forEach(r=>{const ws=talonWorkers(r.talon).filter(w=>w.amount>0), fee=+r.feeUzs||0;
+    const parts=ws.length?ws.map(w=>({k:w.userId,amount:w.amount,shared:true})):[{k:r.masterId||r.acceptedBy,amount:fee,shared:false}];
+    parts.forEach(x=>{if(!x.k) return; const u=ub(x.k); u.rep=(u.rep||0)+x.amount; u.repN=(u.repN||0)+1; (u.reps=u.reps||[]).push({r,amount:x.amount,fee,shared:x.shared});});});
   const hours=Array(24).fill(0); ss.forEach(s=>{const h=+new Intl.DateTimeFormat('en-GB',{hour:'2-digit',hourCycle:'h23',timeZone:'Asia/Tashkent'}).format(new Date(s.ts)); hours[h]+=s.totalUzs;});
   const top={}; ss.forEach(s=>s.items.forEach(i=>{const t=(top[i.name]=top[i.name]||{name:i.name,qty:0,sum:0}); t.qty+=i.qty; t.sum+=i.qty*i.priceUzs;}));
   return {d,ss,rr,rev,prof,back,cnt:ss.length,avg:ss.length?Math.round(sum(ss,s=>s.totalUzs)/ss.length):0,by,pay,hours,reps,top:Object.values(top).sort((a,b)=>b.sum-a.sum).slice(0,5)};
 }
 function kaDelta(a,b){ if(!b) return a?'<span class="ka-up">yangi</span>':''; const p=Math.round((a-b)/Math.abs(b)*100); return p===0?'<span class="ka-eq">±0%</span>':`<span class="${p>0?'ka-up':'ka-down'}">${p>0?'▲':'▼'} ${Math.abs(p)}%</span>`; }
 function kaInit(n){return String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();}
+function kaDetail(b){
+  const nm=t=>esc(String(t).split('|')[0].trim());
+  const sales=b.ss.slice().sort((a,c)=>c.ts-a.ts).map(s=>{const r=s.talon?S.repairs.find(x=>x.talon===s.talon):null;
+    return `<div class="ka-it"><span class="num">${tS(s.ts).slice(0,5)}</span><span class="ka-what">${s.items.map(it=>`${nm(it.name)}${it.qty>1?' ×'+it.qty:''} <i class="num">${fmt(it.priceUzs*it.qty)}</i>`).join('<br>')}</span><b class="num">${fmt(s.totalUzs)}</b>
+      <em>${s.no?'Chek №'+s.no+' · ':''}${PAYN[s.pay]||s.pay}${r?` · 🧩 zapchast → talon №${tn(r.talon)} · ${esc(r.name||'')}`:''}</em></div>`;}).join('');
+  const reps=(b.reps||[]).slice().sort((a,c)=>c.r.doneTs-a.r.doneTs).map(x=>{const r=x.r;
+    return `<div class="ka-it ka-rep"><span class="num">№${tn(r.talon)}</span><span class="ka-what"><b>${esc(r.name||'Mijoz')}</b>${r.phone?` <span class="num muted">${esc(r.phone)}</span>`:''}<br>${esc(r.device||'')}${r.model?' · '+esc(r.model):''}${r.problem?`<br><span class="muted">🔧 ${esc(r.problem)}</span>`:''}</span><b class="num">${fmt(x.amount)}</b>
+      <em>Topshirildi ${tS(r.doneTs).slice(0,5)} · qabul ${dS(r.ts)}${x.shared?` · ish bo'lingan, jami ${fmt(x.fee)}`:''}${talonParts(r.talon)?` · zapchast ${fmt(talonParts(r.talon))}`:''}${x.amount?'':' · narx yozilmagan'}</em></div>`;}).join('');
+  const back=(b.rr||[]).map(r=>`<div class="ka-it"><span class="num">${tS(r.ts).slice(0,5)}</span><span class="ka-what">↩ ${nm(r.name||'')}${r.qty>1?' ×'+r.qty:''}${r.reason?` <span class="muted">(${esc(r.reason)})</span>`:''}</span><b class="num" style="color:var(--bad)">−${fmt(r.refund)}</b></div>`).join('');
+  if(!sales&&!reps&&!back) return '<div class="ka-list"><div class="muted small">Bu kun yozuv yo\'q</div></div>';
+  return `<div class="ka-list">${sales?`<div class="ka-sec">🛒 Sotuvlar · ${b.ss.length} ta · ${fmt(b.ss.reduce((a,s)=>a+s.totalUzs,0))}</div>${sales}`:''}
+    ${reps?`<div class="ka-sec">🔧 Servis ishlari · ${b.reps.length} ta · ${fmt(b.rep||0)}</div>${reps}`:''}
+    ${back?`<div class="ka-sec">↩ Vazvratlar · −${fmt(b.back)}</div>${back}`:''}</div>`;
+}
 function vKunlik(){
   const d=kaDay||today(), y=ymdUz(new Date(d+'T12:00:00').getTime()-864e5), T=kaStat(d), Y=kaStat(y);
   const staff=S.users.filter(u=>u.active!==false), ids=new Set([...staff.map(u=>u.id),...Object.keys(T.by)]);
   const rows=[...ids].map((id,i)=>{const u=S.users.find(x=>x.id===id)||{name:'—',role:''}; const b=T.by[id]||{ss:[],rev:0,prof:0,qty:0,back:0,items:{}}; const yb=Y.by[id];
-    return {id,u,b,yrev:yb?yb.rev:0,col:KA_COL[(S.users.findIndex(x=>x.id===id)+8)%8]};}).sort((a,b)=>b.b.rev-a.b.rev||(b.b.rep||0)-(a.b.rep||0)||a.u.name.localeCompare(b.u.name));
+    return {id,u,b,yrev:yb?yb.rev+(yb.rep||0):0,col:KA_COL[(S.users.findIndex(x=>x.id===id)+8)%8]};}).sort((a,b)=>(b.b.rev+(b.b.rep||0))-(a.b.rev+(a.b.rep||0))||a.u.name.localeCompare(b.u.name));
   const maxRev=Math.max(1,...rows.map(r=>r.b.rev)), totRev=Math.max(1,T.rev);
   const hs=T.hours.slice(8,22), hmx=Math.max(1,...hs), nowH=+new Intl.DateTimeFormat('en-GB',{hour:'2-digit',hourCycle:'h23',timeZone:'Asia/Tashkent'}).format(new Date());
   const payTot=Math.max(1,Object.values(T.pay).reduce((a,v)=>a+v,0)), PC={naqd:'#3bb273',karta:'#2f80ed',otkazma:'#9b51e0',nasiya:'#ff7a59'};
@@ -673,10 +691,10 @@ function vKunlik(){
       <button type="button" class="ka-head" data-kaopen="${r.id}">
         <span class="ka-ava" style="background:conic-gradient(var(--c) ${share*3.6}deg, color-mix(in srgb,var(--c) 18%,transparent) 0)"><span>${esc(kaInit(r.u.name))}</span></span>
         <span class="ka-who"><b>${medal(none?9:i)} ${esc(r.u.name)}</b><small>${esc(ROLES[r.u.role]||'')}${share&&!none?` · ${share}% savdo`:''}</small></span>
-        <span class="ka-sum"><b class="num">${fmt(b.rev)}</b><small>${kaDelta(b.rev,r.yrev)}</small></span></button>
+        <span class="ka-sum"><b class="num">${fmt(b.rev+(b.rep||0))}</b><small>${b.rep&&b.ss.length?`<span class="muted">savdo ${fmt(b.rev)} + servis ${fmt(b.rep)}</span> `:b.rep?'<span class="muted">servis</span> ':''}${kaDelta(b.rev+(b.rep||0),r.yrev)}</small></span></button>
       <div class="ka-bar"><i style="width:${(Math.max(0,b.rev)/maxRev*100).toFixed(1)}%"></i></div>
       <div class="ka-chips">${none?'<span>Bu kun savdo yo\'q</span>':`<span>🧾 ${b.ss.length} chek</span><span>📦 ${b.qty} dona</span><span>💰 ${fmt(b.prof)}</span>${b.rep?`<span>🔧 ${b.repN} ta · ${fmt(b.rep)}</span>`:''}${b.back?`<span class="bad">↩ −${fmt(b.back)}</span>`:''}${topI?`<span title="Eng ko'p sotgani">⭐ ${esc(String(topI[0]).split('|')[0].trim().slice(0,28))}${topI[1]>1?' ×'+topI[1]:''}</span>`:''}`}</div>
-      ${open&&b.ss.length?`<div class="ka-list">${b.ss.slice().sort((a,c)=>c.ts-a.ts).map(s=>`<div><span class="num">${tS(s.ts).slice(0,5)}</span><span>${s.items.map(it=>`${esc(String(it.name).split('|')[0].trim())}${it.qty>1?' ×'+it.qty:''}`).join(', ')}</span><b class="num">${fmt(s.totalUzs)}</b><em>${PAYN[s.pay]||s.pay}</em></div>`).join('')}</div>`:''}
+      ${open?kaDetail(b):''}
     </div>`;}).join('')}
   </div>
   ${T.top.length?`<div class="ka-topp"><div class="ka-eyebrow" style="color:var(--muted)">Kun yetakchilari</div>${T.top.map((t,i)=>`<div><span class="ka-n">${i+1}</span><span class="ka-tn">${esc(String(t.name).split('|')[0].trim())}</span><span class="num muted">×${t.qty}</span><b class="num">${fmt(t.sum)}</b></div>`).join('')}</div>`:''}

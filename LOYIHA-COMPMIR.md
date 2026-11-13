@@ -77,6 +77,7 @@
 - Hisobot tepasida yangi dizayndagi blok: kun tanlash (‹ › va sana), tushum, foyda, cheklar, o'rtacha chek, vazvrat — kechagiga nisbatan ▲▼ %; soatlar bo'yicha savdo grafigi (hozirgi soat ajralib turadi), to'lov turlari ulushi
 - Har bir xodim kartochkasi: tushum, savdodagi ulushi (avatar halqasi), cheklar, dona, foyda, topshirilgan remontlar, vazvrat, eng ko'p sotgani; bosilsa shu kungi sotuvlari vaqti bilan; savdosi yo'qlar xira; 🥇🥈🥉 reyting
 - "Kun yetakchilari" — eng ko'p tushum keltirgan 5 tovar
+- Xodim kartochkasi bosilsa: 🛒 sotuvlar (vaqt, chek №, har tovar narxi, to'lov turi, zapchast bo'lsa qaysi talon/mijozga), 🔧 servis ishlari (talon №, mijoz ismi va telefoni, qurilma, nima ish qilingani, topshirilgan vaqt, ustaga tushgan summa — ish bo'lingan bo'lsa ulushi), ↩ vazvratlar; kartochka summasi = savdo + servis
 
 ### 2026-11-13 (2) — Yangi dizayn "Aurora" (butun dastur)
 - Butun dastur kunlik analitika bloki uslubida: indigo→firuza nurli yon panel (telefonda pastki shishasimon panel), tepasida rangli chiziqli shishasimon kartalar, gradient tugmalar, nurli kartochkalar, gradient sarlavhalar; yorug' va qorong'i rejimda ishlaydi
