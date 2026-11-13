@@ -74,7 +74,7 @@ export const PAYS: Record<string, string> = { naqd: 'Naqd', karta: 'Karta', otka
 // 6) Dushanba kuni haftalik, oyning 1-kuni oylik tahlil
 // 7) Ustaxona nazorati: qabul/diagnostikadagi qurilmalar bo'yicha guruhga so'rov (javob bo'lmasa har 30 daqiqada qayta)
 
-import * as XLSX from 'npm:xlsx@0.18.5';
+import XLSX from 'npm:xlsx-js-style@1.2.0';
 
 type Db = ReturnType<typeof admin>;
 
@@ -314,12 +314,17 @@ async function sendDayExcel(db: Db, s: any, day: string) {
   const ph: unknown[][] = [['Talon', 'Qabul', 'Mijoz', 'Telefon', 'Qurilma', 'Muammo', 'Holati', 'Narxi (so\'m)', 'Usta', 'Topshirildi']];
   for (const r of reps || []) ph.push([r.talon, uzTime(r.created_at), r.client_name, r.client_phone, [r.device, r.model].filter(Boolean).join(' '), r.problem, r.status, Number(r.fee_uzs || 0), nm(r.master_id), uzTime(r.done_at)]);
 
+  const sub = `${dmy(day)} · kurs 1$ = ${Number(d?.rate || s.rate || 0).toLocaleString('ru-RU')} so'm`;
+  const toCols = (h: unknown[], types: Record<number, XCol['t']>, wrap: number[] = []) => h.map((x, i) => ({ h: String(x), t: types[i], wrap: wrap.includes(i), max: wrap.includes(i) ? 50 : 30 } as XCol));
+  const body = (rows: unknown[][]) => rows.slice(1).map((v) => ({ v } as XRow));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheet(sum, [32, 18]), 'Xulosa');
-  XLSX.utils.book_append_sheet(wb, sheet(sh, [20, 8, 50, 6, 14, 14, 14, 10, 18, 14, 14]), 'Sotuvlar');
-  XLSX.utils.book_append_sheet(wb, sheet(eh, [20, 18, 14, 18, 30, 18]), 'Rasxodlar');
-  XLSX.utils.book_append_sheet(wb, sheet(rh, [20, 8, 40, 6, 14, 24, 18]), 'Vazvratlar');
-  XLSX.utils.book_append_sheet(wb, sheet(ph, [8, 20, 20, 16, 26, 30, 12, 14, 18, 20]), 'Remontlar');
+  XLSX.utils.book_append_sheet(wb, xSheet(`${name} — kunlik hisobot`, sub, [{ h: "Ko'rsatkich", max: 36 }, { h: 'Qiymat', t: 'uzs' }],
+    sum.slice(2).map((v) => ({ v, font: String(v[0]).startsWith('   ') ? XC.muted : undefined } as XRow))), 'Xulosa');
+  XLSX.utils.book_append_sheet(wb, xSheet(`${name} — sotuvlar`, sub, toCols(sh[0], { 1: 'int', 3: 'int', 4: 'uzs', 5: 'uzs', 6: 'uzs', 9: 'uzs', 10: 'uzs' }, [2]), body(sh)), 'Sotuvlar');
+  XLSX.utils.book_append_sheet(wb, xSheet(`${name} — rasxodlar`, sub, toCols(eh[0], { 2: 'uzs' }, [4]), body(eh)), 'Rasxodlar');
+  XLSX.utils.book_append_sheet(wb, xSheet(`${name} — vazvratlar`, sub, toCols(rh[0], { 1: 'int', 3: 'int', 4: 'uzs' }, [2]), body(rh)), 'Vazvratlar');
+  XLSX.utils.book_append_sheet(wb, xSheet(`${name} — remontlar`, sub, toCols(ph[0], { 0: 'int', 7: 'uzs' }, [5]),
+    ph.slice(1).map((v) => ({ v: [...v.slice(0, 6), (XST[String(v[6])] || [v[6]])[0], ...v.slice(7)], cellFill: { 6: (XST[String(v[6])] || ['', 'FFFFFF'])[1] } } as XRow))), 'Remontlar');
   const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
   const form = new FormData();
   form.append('chat_id', String(s.tg.group));
@@ -328,12 +333,237 @@ async function sendDayExcel(db: Db, s: any, day: string) {
   await tgForm('sendDocument', form);
 }
 
-async function sendBackupExcel(s: any, day: string, dump: Record<string, unknown[]>) {
-  const wb = XLSX.utils.book_new();
-  for (const [t, rows] of Object.entries(dump)) {
-    const flat = (rows as any[]).map((r) => Object.fromEntries(Object.entries(r || {}).map(([k, v]) => [k, v !== null && typeof v === 'object' ? JSON.stringify(v) : v])));
-    XLSX.utils.book_append_sheet(wb, flat.length ? XLSX.utils.json_to_sheet(flat) : XLSX.utils.aoa_to_sheet([['(bo\'sh)']]), t.slice(0, 31));
+// ===== Chiroyli Excel (ranglar dastur dizayni kabi: indigo → firuza) =====
+type XCol = { h: string; t?: 'uzs' | 'usd' | 'int' | 'txt'; max?: number; wrap?: boolean };
+type XRow = { v: unknown[]; k?: 'sec' | 'sub' | 'tot'; fill?: string; font?: string; cellFill?: Record<number, string> };
+const XC = { ink: '16132E', head: '1F1A4D', title: '4A35B8', teal: '0E8F93', zebra: 'F6F4FD', line: 'D9D4F0', white: 'FFFFFF', muted: '69658C',
+  sec: ['6447EE', '0E8F93', 'D0457A', '2B67D1', 'B26A00', '3B8F3B', '8A4FD8', '0F6B66'] };
+const xb = (rgb: string) => ({ style: 'thin', color: { rgb } });
+const XBORDER = { top: xb(XC.line), bottom: xb(XC.line), left: xb(XC.line), right: xb(XC.line) };
+const XFMT: Record<string, string> = { uzs: '#,##0', usd: '"$"#,##0.00', int: '0' };
+const xLen = (v: unknown, t?: string) => v == null || v === '' ? 0 : typeof v === 'number' ? (t === 'usd' ? v.toFixed(2).length + 4 : Math.round(v).toLocaleString('en-US').length + 1) : Math.max(...String(v).split('\n').map((l) => l.length));
+
+function xSheet(title: string, sub: string, cols: XCol[], rows: XRow[]) {
+  const n = cols.length, aoa: unknown[][] = [[title], [sub], cols.map((c) => c.h), ...rows.map((r) => r.v)];
+  const ws: any = XLSX.utils.aoa_to_sheet(aoa);
+  const merges: any[] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: n - 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: n - 1 } }];
+  const cell = (r: number, c: number) => { const a = XLSX.utils.encode_cell({ r, c }); return ws[a] || (ws[a] = { t: 's', v: '' }); };
+  for (let c = 0; c < n; c++) {
+    cell(0, c).s = { fill: { fgColor: { rgb: XC.title } }, font: { bold: true, sz: 15, color: { rgb: XC.white } }, alignment: { vertical: 'center' } };
+    cell(1, c).s = { fill: { fgColor: { rgb: XC.head } }, font: { sz: 10, color: { rgb: 'C9BDFF' } }, alignment: { vertical: 'center' } };
+    cell(2, c).s = { fill: { fgColor: { rgb: XC.teal } }, font: { bold: true, sz: 10, color: { rgb: XC.white } }, border: XBORDER,
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
   }
+  let z = 0;
+  rows.forEach((r, i) => {
+    const R = i + 3;
+    if (r.k === 'sec') {
+      merges.push({ s: { r: R, c: 0 }, e: { r: R, c: n - 1 } }); z = 0;
+      for (let c = 0; c < n; c++) cell(R, c).s = { fill: { fgColor: { rgb: r.fill || XC.sec[0] } }, font: { bold: true, sz: 12, color: { rgb: XC.white } }, alignment: { vertical: 'center' } };
+      return;
+    }
+    const tot = r.k === 'sub' || r.k === 'tot';
+    const bg = r.k === 'tot' ? XC.head : r.k === 'sub' ? 'E9E4FF' : r.fill || (z++ % 2 ? XC.zebra : XC.white);
+    for (let c = 0; c < n; c++) {
+      const x = cell(R, c), t = cols[c].t;
+      x.s = { fill: { fgColor: { rgb: r.cellFill?.[c] || bg } }, border: XBORDER,
+        font: { sz: 10, bold: tot, color: { rgb: r.k === 'tot' ? XC.white : r.font || XC.ink } },
+        alignment: { vertical: 'top', wrapText: !!cols[c].wrap, horizontal: t && t !== 'txt' ? 'right' : 'left' } };
+      if (typeof x.v === 'number' && t && XFMT[t]) x.s.numFmt = XFMT[t];
+    }
+  });
+  ws['!merges'] = merges;
+  ws['!cols'] = cols.map((c, i) => ({ wch: Math.min(c.max || 42, Math.max(6, Math.ceil(c.h.length * 0.8) + 2, ...rows.filter((r) => r.k !== 'sec').map((r) => xLen(r.v[i], c.t) + 2))) }));
+  ws['!rows'] = [{ hpt: 28 }, { hpt: 18 }, { hpt: 30 }];
+  if (rows.length) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 2, c: 0 }, e: { r: 2 + rows.length, c: n - 1 } }) };
+  return ws;
+}
+const xN = (v: unknown) => v == null || v === '' ? '' : Number(v);
+const xT = (t: string | null) => t ? new Date(t).toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+const xD = (t: string | null) => t ? new Date(t).toLocaleDateString('ru-RU', { timeZone: 'Asia/Tashkent' }) : '';
+const xDay = (t: string) => new Date(t).toLocaleDateString('sv-SE', { timeZone: 'Asia/Tashkent' });
+const XST: Record<string, [string, string]> = { qabul: ['Qabul qilindi', 'E3ECFF'], diag: ['Diagnostikada', 'FFF0D6'], tamir: ["Ta'mirda", 'FFE6C7'], tayyor: ['✅ Tayyor', 'D9F5EC'], berildi: ['Berildi', 'ECECF2'] };
+const XROLE: Record<string, string> = { owner: 'Rahbar', usta: 'Usta', sotuvchi: 'Sotuvchi', usta_sotuvchi: 'Usta va sotuvchi' };
+const xWar = (w: any) => w && w.n ? `${w.n} ${w.u || 'oy'}` : '';
+
+function buildBackupBook(s: any, day: string, dump: Record<string, any[]>) {
+  const rate = Number(s.rate || 0), name = s.company?.name || 'COMPMIR', stamp = `Zaxira: ${dmy(day)} 00:00 · kurs 1$ = ${rate.toLocaleString('ru-RU')} so'm`;
+  const T = (k: string) => (dump[k] || []) as any[];
+  const prof = Object.fromEntries(T('profiles').map((p) => [p.id, p]));
+  const nm = (id: string | null) => (id && prof[id]?.name) || '';
+  const cost = Object.fromEntries(T('product_costs').map((c) => [c.product_id, Number(c.cost_usd)]));
+  const sales = Object.fromEntries(T('sales').map((x) => [x.id, x]));
+  const icost = Object.fromEntries(T('sale_item_costs').map((c) => [c.item_id, c]));
+  const clients = Object.fromEntries(T('clients').map((c) => [c.phone, c]));
+  const wb = XLSX.utils.book_new();
+  const add = (ws: any, t: string) => XLSX.utils.book_append_sheet(wb, ws, t);
+
+  // --- Ombor: bo'limlar bo'yicha
+  const lines = [...new Set(T('products').map((p) => p.line))].sort((a, b) => { const o = (x: string) => { const i = ['noutbuk', 'kompyuter'].indexOf(x); return i < 0 ? 9 : i; }; return o(a) - o(b) || String(a).localeCompare(String(b)); });
+  const oc: XCol[] = [{ h: '№', t: 'int' }, { h: 'Nomi', max: 60, wrap: true }, { h: 'Shtrix-kod' }, { h: 'Soni', t: 'int' }, { h: 'Kelish narxi ($)', t: 'usd' },
+    { h: "Sotish narxi (so'm)", t: 'uzs' }, { h: 'Sotish narxi ($)', t: 'usd' }, { h: 'Kelish jami ($)', t: 'usd' }, { h: "Sotish jami (so'm)", t: 'uzs' }, { h: 'Kafolat' }, { h: 'Oxirgi kirim' }];
+  const or: XRow[] = []; let gq = 0, gc = 0, gs = 0, gk = 0;
+  lines.forEach((ln, li) => {
+    const ps = T('products').filter((p) => p.line === ln).sort((a, b) => b.qty - a.qty || String(a.name).localeCompare(String(b.name)));
+    const live = ps.filter((p) => p.qty > 0);
+    or.push({ k: 'sec', v: [`📦 ${lineName(s, ln)} — ${live.length} xil, ${live.reduce((a, p) => a + p.qty, 0)} dona`], fill: XC.sec[li % XC.sec.length] });
+    let q = 0, c = 0, so = 0;
+    ps.forEach((p, i) => {
+      const cu = cost[p.id] || 0, su = p.sell_uzs ? Number(p.sell_uzs) : Math.round(Number(p.sell_usd || 0) * rate), sd = p.sell_uzs ? (rate ? Number(p.sell_uzs) / rate : 0) : Number(p.sell_usd || 0);
+      q += p.qty; c += cu * p.qty; so += su * p.qty;
+      or.push({ v: [i + 1, p.name, p.barcode, p.qty, cu || '', su || '', sd ? +sd.toFixed(2) : '', cu ? +(cu * p.qty).toFixed(2) : '', su * p.qty || '', xWar(p.warranty), xD(p.last_in || p.created_at)],
+        font: p.qty ? undefined : '9A97B5', cellFill: p.qty > 0 && p.min_qty && p.qty <= p.min_qty ? { 3: 'FDE4EA' } : undefined });
+    });
+    or.push({ k: 'sub', v: ['', `Jami: ${lineName(s, ln)}`, '', q, '', '', '', +c.toFixed(2), so, '', ''] });
+    gq += q; gc += c; gs += so; gk += live.length;
+  });
+  or.push({ k: 'tot', v: ['', `UMUMIY OMBOR — ${gk} xil`, '', gq, '', '', '', +gc.toFixed(2), gs, '', ''] });
+
+  // --- Talonlar: zapchast summalari
+  const parts: Record<number, number> = {};
+  T('sales').forEach((x) => { if (x.repair_talon) parts[x.repair_talon] = (parts[x.repair_talon] || 0) + Number(x.total_uzs); });
+  const tc: XCol[] = [{ h: 'Talon №', t: 'int' }, { h: 'Qabul' }, { h: 'Mijoz', max: 28 }, { h: 'Telefon' }, { h: "Qo'shimcha raqam" }, { h: 'Qurilma', max: 30, wrap: true },
+    { h: 'Seriya' }, { h: 'Komplekt', max: 24, wrap: true }, { h: 'Muammo / ish', max: 40, wrap: true }, { h: 'Holati' }, { h: "Servis (so'm)", t: 'uzs' }, { h: "Zapchast (so'm)", t: 'uzs' },
+    { h: "Jami (so'm)", t: 'uzs' }, { h: 'Usta' }, { h: 'Qabul qildi' }, { h: 'Topshirildi' }];
+  const tr: XRow[] = [];
+  const reps = T('repairs').slice().sort((a, b) => b.talon - a.talon);
+  const grp: [string, (r: any) => boolean, string][] = [['🔧 Ustaxonada (hali berilmagan)', (r) => r.status !== 'berildi', XC.sec[0]], ['✅ Mijozga topshirilgan', (r) => r.status === 'berildi', XC.sec[1]]];
+  for (const [title, f, col] of grp) {
+    const list = reps.filter(f); if (!list.length) continue;
+    tr.push({ k: 'sec', v: [`${title} — ${list.length} ta`], fill: col });
+    let sf = 0, sp = 0;
+    for (const r of list) {
+      const st = XST[r.status] || [r.status, XC.white], p = parts[r.talon] || 0, fee = Number(r.fee_uzs || 0); sf += fee; sp += p;
+      tr.push({ v: [r.talon, xT(r.created_at), r.client_name, r.client_phone, [r.client_phone2, r.client_phone_old && `eski: ${r.client_phone_old}`].filter(Boolean).join('\n'),
+        [r.device, r.model].filter(Boolean).join(' · '), r.serial || '', r.accessories || '', r.problem, st[0], fee || '', p || '', fee + p || '', nm(r.master_id), nm(r.accepted_by), xT(r.done_at)],
+        cellFill: { 9: st[1] } });
+    }
+    tr.push({ k: 'sub', v: ['', 'Jami', '', '', '', '', '', '', '', '', sf, sp, sf + sp, '', '', ''] });
+  }
+
+  // --- Sotuvlar: kunlar bo'yicha
+  const sc: XCol[] = [{ h: 'Chek №', t: 'int' }, { h: 'Vaqt' }, { h: 'Tovar', max: 55, wrap: true }, { h: "Bo'lim" }, { h: 'Soni', t: 'int' }, { h: 'Kelish ($)', t: 'usd' },
+    { h: "Tannarx (so'm)", t: 'uzs' }, { h: "Narx (so'm)", t: 'uzs' }, { h: "Summa (so'm)", t: 'uzs' }, { h: "Foyda (so'm)", t: 'uzs' }, { h: "To'lov" }, { h: 'Sotuvchi' }, { h: 'Mijoz' }, { h: 'Talon' }];
+  const items = T('sale_items').map((i) => ({ i, x: sales[i.sale_id] })).filter((o) => o.x).sort((a, b) => String(b.x.created_at).localeCompare(String(a.x.created_at)) || b.i.id - a.i.id);
+  const sr: XRow[] = []; let cur = '', dq = 0, ds = 0, dp = 0, di = 0, all = 0, allp = 0;
+  const flush = () => { if (cur) sr.push({ k: 'sub', v: ['', `${dmy(cur)} jami`, '', '', dq, '', '', '', ds, dp, '', '', '', ''] }); };
+  for (const { i, x } of items) {
+    const d = xDay(x.created_at);
+    if (d !== cur) { flush(); cur = d; dq = ds = dp = 0; sr.push({ k: 'sec', v: [`🛒 ${dmy(d)}`], fill: XC.sec[di++ % 2 ? 1 : 0] }); }
+    const c = icost[i.id], cu = c ? Number(c.cost_usd) : 0, tn = c ? Math.round(cu * Number(c.rate) * i.qty) : 0, sum = Number(i.price_uzs) * i.qty, pr = c ? sum - tn : 0;
+    dq += i.qty; ds += sum; dp += pr; all += sum; allp += pr;
+    const cl = x.client_phone ? `${clients[x.client_phone]?.name || ''} ${x.client_phone}`.trim() : '';
+    sr.push({ v: [x.no, xT(x.created_at), i.name, lineName(s, i.line), i.qty, cu || '', tn || '', Number(i.price_uzs), sum, c ? pr : '', PAYN_X[x.pay] || x.pay, nm(x.user_id), cl, x.repair_talon || ''],
+      cellFill: x.pay === 'nasiya' ? { 10: 'FFF0D6' } : undefined, font: pr < 0 ? 'CF3556' : undefined });
+  }
+  flush();
+  if (items.length) sr.push({ k: 'tot', v: ['', 'HAMMA SOTUVLAR', '', '', '', '', '', '', all, allp, '', '', '', ''] });
+
+  // --- Mijozlar
+  const mc: XCol[] = [{ h: 'Telefon' }, { h: 'Ism', max: 30 }, { h: 'Talonlar', t: 'int' }, { h: 'Oxirgi talon' }, { h: 'Xaridlar', t: 'int' }, { h: "Nasiya qoldig'i (so'm)", t: 'uzs' }, { h: 'Telegram bot' }, { h: "Qo'shilgan" }];
+  const mr: XRow[] = T('clients').slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).map((c) => {
+    const rs = T('repairs').filter((r) => r.client_phone === c.phone).sort((a, b) => b.talon - a.talon), bs = T('sales').filter((x) => x.client_phone === c.phone).length;
+    const debt = T('customer_debts').filter((d) => d.client_phone === c.phone && !d.closed).reduce((a, d) => a + Number(d.amount_uzs) - Number(d.paid_uzs), 0);
+    return { v: [c.phone, c.name, rs.length || '', rs[0] ? `№${rs[0].talon} · ${rs[0].device}${rs[0].model ? ' ' + rs[0].model : ''}` : '', bs || '', debt || '', c.tg_chat_id ? '✅ ulangan' : '', xD(c.created_at)], cellFill: debt > 0 ? { 5: 'FFF0D6' } : undefined };
+  });
+
+  // --- Nasiyalar
+  const today = day;
+  const nc: XCol[] = [{ h: 'Sana' }, { h: 'Mijoz', max: 28 }, { h: 'Telefon' }, { h: "Jami (so'm)", t: 'uzs' }, { h: "To'langan (so'm)", t: 'uzs' }, { h: "Qoldiq (so'm)", t: 'uzs' }, { h: 'Muddat' }, { h: 'Holati' }, { h: 'Izoh', max: 34, wrap: true }];
+  const nr: XRow[] = [];
+  const nd = T('customer_debts').slice().sort((a, b) => Number(a.closed) - Number(b.closed) || String(b.created_at).localeCompare(String(a.created_at)));
+  for (const [title, f, col] of [['💸 Ochiq nasiyalar', (d: any) => !d.closed, XC.sec[2]], ['✔ Yopilgan', (d: any) => d.closed, XC.sec[1]]] as [string, (d: any) => boolean, string][]) {
+    const l = nd.filter(f); if (!l.length) continue;
+    nr.push({ k: 'sec', v: [`${title} — ${l.length} ta`], fill: col });
+    for (const d of l) {
+      const left = Number(d.amount_uzs) - Number(d.paid_uzs), late = !d.closed && d.due_date && d.due_date < today;
+      nr.push({ v: [xD(d.created_at), d.client_name, d.client_phone, Number(d.amount_uzs), Number(d.paid_uzs) || '', left || '', d.due_date ? dmy(d.due_date) : '', d.closed ? 'Yopildi' : late ? "⚠ Muddati o'tgan" : 'Ochiq', d.note || ''],
+        cellFill: late ? { 6: 'FDE4EA', 7: 'FDE4EA' } : undefined });
+    }
+    nr.push({ k: 'sub', v: ['', 'Jami', '', l.reduce((a, d) => a + Number(d.amount_uzs), 0), l.reduce((a, d) => a + Number(d.paid_uzs), 0), l.reduce((a, d) => a + Number(d.amount_uzs) - Number(d.paid_uzs), 0), '', '', ''] });
+  }
+
+  // --- Tovar qarzlari (kimdan olingan bo'yicha)
+  const qc: XCol[] = [{ h: 'Sana' }, { h: 'Tovar', max: 45, wrap: true }, { h: 'Soni', t: 'int' }, { h: 'Summa', t: 'uzs' }, { h: 'Valyuta' }, { h: 'Berildi', t: 'uzs' }, { h: 'Qoldiq', t: 'uzs' }, { h: 'Talon' }, { h: 'Holati' }, { h: 'Yozdi' }];
+  const qr: XRow[] = [];
+  const sups = [...new Set(T('supplier_debts').map((d) => d.supplier))].sort();
+  sups.forEach((sp, si) => {
+    const l = T('supplier_debts').filter((d) => d.supplier === sp).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const open = l.filter((d) => !d.closed);
+    qr.push({ k: 'sec', v: [`🤝 ${sp} — ${l.length} ta yozuv, ${open.length} tasi qarzda`], fill: XC.sec[si % XC.sec.length] });
+    for (const d of l) {
+      const amt = d.amount == null ? '' : Number(d.amount), left = amt === '' ? '' : Number(amt) - Number(d.paid || 0);
+      const st = d.closed ? ['✔ Qarz berilgan', 'D9F5EC'] : d.handed_at ? ['Topshirilgan', 'E3ECFF'] : d.due_date && d.due_date < today ? ["Muddati o'tgan", 'FDE4EA'] : ['Qarzda', 'FFF0D6'];
+      qr.push({ v: [xD(d.created_at), d.item_name, d.qty, amt, d.currency === 'usd' ? '$' : "so'm", Number(d.paid || 0) || '', d.closed ? '' : left, d.repair_talon ? `№${d.repair_talon}` : '', st[0], nm(d.user_id)], cellFill: { 8: st[1] } });
+    }
+  });
+
+  // --- Rasxodlar
+  const rc: XCol[] = [{ h: 'Sana' }, { h: 'Turi' }, { h: "Summa (so'm)", t: 'uzs' }, { h: "To'lov" }, { h: 'Kimga' }, { h: 'Izoh', max: 40, wrap: true }, { h: 'Kiritdi' }];
+  const rr: XRow[] = []; let mon = '', ms = 0, mi = 0;
+  const mflush = () => { if (mon) rr.push({ k: 'sub', v: ['', `${mon} jami`, ms, '', '', '', ''] }); };
+  for (const e of T('expenses').slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))) {
+    const m = xDay(e.created_at).slice(0, 7).split('-').reverse().join('.');
+    if (m !== mon) { mflush(); mon = m; ms = 0; rr.push({ k: 'sec', v: [`💳 ${m}`], fill: XC.sec[mi++ % 2 ? 4 : 2] }); }
+    ms += Number(e.amount_uzs);
+    rr.push({ v: [xT(e.created_at), CATS[e.cat] || e.cat, Number(e.amount_uzs), e.pay === 'karta' ? 'Karta' : 'Naqd', nm(e.to_user), e.note || '', nm(e.user_id)] });
+  }
+  mflush();
+
+  // --- Vazvratlar
+  const items2 = Object.fromEntries(T('sale_items').map((i) => [i.id, i]));
+  const vc: XCol[] = [{ h: 'Sana' }, { h: 'Chek №', t: 'int' }, { h: 'Tovar', max: 45, wrap: true }, { h: 'Soni', t: 'int' }, { h: "Qaytarildi (so'm)", t: 'uzs' }, { h: 'Sabab', max: 34, wrap: true }, { h: 'Kim' }];
+  const vr: XRow[] = T('sale_returns').slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .map((r) => ({ v: [xT(r.created_at), sales[r.sale_id]?.no || '', items2[r.item_id]?.name || '', r.qty, Number(r.refund_uzs), r.reason || '', nm(r.user_id)] }));
+
+  // --- Xodimlar
+  const pay = Object.fromEntries(T('staff_pay').map((p) => [p.user_id, p]));
+  const xc: XCol[] = [{ h: 'Ism' }, { h: 'Login' }, { h: 'Lavozim' }, { h: "Oklad (so'm)", t: 'uzs' }, { h: 'KPI %', t: 'int' }, { h: 'KPI asosi' }, { h: 'Holati' }];
+  const xr: XRow[] = T('profiles').map((p) => ({ v: [p.name, p.login || '', XROLE[p.role] || p.role, Number(pay[p.id]?.oklad || 0) || '', Number(pay[p.id]?.kpi || 0) || '', pay[p.id]?.kpi_base || '', p.active ? 'Faol' : "O'chirilgan"], font: p.active ? undefined : '9A97B5' }));
+
+  // --- Xulosa
+  const y = addDay(day, -1), ys = T('sales').filter((x) => xDay(x.created_at) === y);
+  const inShop = T('repairs').filter((r) => r.status !== 'berildi');
+  const nOpen = T('customer_debts').filter((d) => !d.closed).reduce((a, d) => a + Number(d.amount_uzs) - Number(d.paid_uzs), 0);
+  const qOpen = (cur: string) => T('supplier_debts').filter((d) => !d.closed && d.currency === cur && d.amount != null).reduce((a, d) => a + Number(d.amount) - Number(d.paid || 0), 0);
+  const kc: XCol[] = [{ h: "Ko'rsatkich", max: 40 }, { h: 'Qiymat', max: 26 }, { h: 'Izoh', max: 46, wrap: true }];
+  const kr: XRow[] = [
+    { k: 'sec', v: ['📦 Ombor'], fill: XC.sec[0] },
+    { v: ['Tovarlar (bor)', `${gk} xil · ${gq} dona`, `${lines.length} ta bo'lim`] },
+    { v: ['Kelish qiymati', `$${gc.toFixed(2)}`, `≈ ${Math.round(gc * rate).toLocaleString('ru-RU')} so'm`] },
+    { v: ['Sotish qiymati', `${gs.toLocaleString('ru-RU')} so'm`, gs && gc ? `Kutilayotgan foyda ≈ ${Math.round(gs - gc * rate).toLocaleString('ru-RU')} so'm` : ''] },
+    { v: ['Kam qolgan tovarlar', T('products').filter((p) => p.qty > 0 && p.min_qty && p.qty <= p.min_qty).length + ' ta', 'Ombor varag\'ida qizil katak'] },
+    { k: 'sec', v: ['🔧 Ustaxona'], fill: XC.sec[1] },
+    ...Object.entries(XST).filter(([k]) => k !== 'berildi').map(([k, [t, f]]) => ({ v: [t, `${inShop.filter((r) => r.status === k).length} ta`, ''], cellFill: { 1: f } } as XRow)),
+    { v: ['Jami talonlar', `${T('repairs').length} ta`, `Oxirgi talon №${reps[0]?.talon ?? '-'}`] },
+    { k: 'sec', v: [`🛒 Kechagi savdo (${dmy(y)})`], fill: XC.sec[2] },
+    { v: ['Cheklar', `${ys.length} ta`, ''] },
+    { v: ['Tushum', `${ys.reduce((a, x) => a + Number(x.total_uzs), 0).toLocaleString('ru-RU')} so'm`, ''] },
+    { k: 'sec', v: ['💰 Qarzlar'], fill: XC.sec[3] },
+    { v: ['Mijozlar nasiyasi (ochiq)', `${nOpen.toLocaleString('ru-RU')} so'm`, `${T('customer_debts').filter((d) => !d.closed).length} ta`] },
+    { v: ['Tovar qarzlarimiz ($)', `$${qOpen('usd').toFixed(2)}`, ''] },
+    { v: ["Tovar qarzlarimiz (so'm)", `${qOpen('uzs').toLocaleString('ru-RU')} so'm`, ''] },
+    { k: 'sec', v: ['👥 Baza'], fill: XC.sec[5] },
+    { v: ['Mijozlar', `${T('clients').length} ta`, ''] },
+    { v: ['Jami sotuvlar', `${T('sales').length} ta chek`, ''] },
+    { v: ['Xodimlar', `${T('profiles').filter((p) => p.active).length} ta faol`, ''] },
+  ];
+
+  add(xSheet(`${name} — baza zaxirasi`, stamp, kc, kr), 'Xulosa');
+  add(xSheet(`${name} — Ombor qoldig'i`, stamp + ' · qizil katak — kam qolgan', oc, or), 'Ombor');
+  add(xSheet(`${name} — Ustaxona talonlari`, stamp, tc, tr), 'Talonlar');
+  add(xSheet(`${name} — Sotuvlar`, stamp + ' · kunlar bo\'yicha, yangisi tepada', sc, sr), 'Sotuvlar');
+  add(xSheet(`${name} — Mijozlar`, stamp, mc, mr), 'Mijozlar');
+  add(xSheet(`${name} — Nasiyalar`, stamp, nc, nr), 'Nasiyalar');
+  add(xSheet(`${name} — Tovar qarzlari`, stamp + ' · kimdan olingani bo\'yicha', qc, qr), 'Tovar qarzlari');
+  add(xSheet(`${name} — Rasxodlar`, stamp + ' · oylar bo\'yicha', rc, rr), 'Rasxodlar');
+  add(xSheet(`${name} — Vazvratlar`, stamp, vc, vr), 'Vazvratlar');
+  add(xSheet(`${name} — Xodimlar`, stamp, xc, xr), 'Xodimlar');
+  return wb;
+}
+
+async function sendBackupExcel(s: any, day: string, dump: Record<string, unknown[]>) {
+  const wb = buildBackupBook(s, day, dump as Record<string, any[]>);
   const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
   const form = new FormData();
   form.append('chat_id', String(s.tg.channel));

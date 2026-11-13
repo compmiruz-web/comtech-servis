@@ -83,6 +83,11 @@
 - Butun dastur kunlik analitika bloki uslubida: indigo→firuza nurli yon panel (telefonda pastki shishasimon panel), tepasida rangli chiziqli shishasimon kartalar, gradient tugmalar, nurli kartochkalar, gradient sarlavhalar; yorug' va qorong'i rejimda ishlaydi
 - Odatiy mavzu — "Aurora (yangi)"; eski ranglar (Yashil, Ko'k, Bordo, Binafsha, Grafit, Tun) Sozlamalar → Mavzu'da tanlanadi
 
+### 2026-11-13 (3) — Chiroyli Excel fayllar
+- 00:00 baza zaxirasi Excel'i endi o'qish uchun: Xulosa, Ombor (bo'limlar bo'yicha rangli; kelish $, sotish so'm/$, jami, kafolat, kam qolgan — qizil), Talonlar (ustaxonada / topshirilgan; mijoz, telefon, qurilma, muammo, holat rangi, servis + zapchast), Sotuvlar (kunlar bo'yicha, kelish narxi, tannarx, foyda, mijoz, talon), Mijozlar, Nasiyalar, Tovar qarzlari (kimdan olingani bo'yicha), Rasxodlar (oylar bo'yicha), Vazvratlar, Xodimlar
+- 21:00 kunlik hisobot Excel'i ham shu uslubda; to'liq tiklash uchun JSON fayl avvalgidek
+- Kutubxona: `npm:xlsx-js-style` (ranglar uchun)
+
 ## Kelishuvlar
 - Javoblar o'zbek tilida
 - Foydani faqat rahbar ko'radi
